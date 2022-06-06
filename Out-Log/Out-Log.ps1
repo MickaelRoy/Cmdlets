@@ -3,7 +3,7 @@
 .Synopsis
    Append dated and categorized text.
 .DESCRIPTION
-   Append dated and categorized text to the stadard output or log formated file.
+   Append dated and categorized text to the standard output or log formated file.
 .PARAMETER Path
     Specifies the path of the log file.
 
@@ -20,13 +20,15 @@
     Prevent crlf at this end of the line.
 
 .PARAMETER Tee
-    Specifies to Write the line on both stadard output and log file.
+    Specifies to Write the line on both standard output and log file.
     
 .EXAMPLE
    "Messsage" | Out-Log ACTION C:\Temp\log3.txt
+   Append a new line tagged ACTION in log3.txt file.
 
 .EXAMPLE
     "Message action affiché en sortie standard ET journalisé" | Out-Log Action -Tee -Path c:\temp\Log.txt
+    Display a line on standard outpur and appen the same line in log.txt, both tagged ACTION
 
 .INPUTS
     System.String
