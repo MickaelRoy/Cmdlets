@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Configuration>  
+    <ViewDefinitions>
+          <View>
+      <Name>DefaultView</Name>
+      <ViewSelectedBy>
+        <TypeName>ToolSet.TraceRoute</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <PropertyName>ComputerName</PropertyName>
+              </ListItem>
+              <ListItem>
+                <PropertyName>RemoteAddress</PropertyName>
+              </ListItem>
+              <ListItem>
+                <PropertyName>InterfaceAlias</PropertyName>
+              </ListItem>
+              <ListItem>
+                <PropertyName>SourceAddress</PropertyName>
+              </ListItem>
+              <ListItem>
+                <PropertyName>PingSucceeded</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>TraceRoute</Label>
+                <ItemSelectionCondition>
+                  <ScriptBlock>
+                    ($_.TraceRoute -ne $null)
+                  </ScriptBlock>
+                </ItemSelectionCondition>
+                <ScriptBlock>
+                  $output = "";
+                  foreach($Result in $_.TraceRoute) {
+                      $output += $Result + "`n";
+                  };
+                  $output.Trim("`n");
+                </ScriptBlock>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+    <View>
+      <Name>TableView</Name>
+      <ViewSelectedBy>
+        <TypeName>ToolSet.TraceRoute</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader>
+            <Width>32</Width>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Width>15</Width>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Width>15</Width>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Width>15</Width>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Width>15</Width>
+          </TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem>
+                <PropertyName>ComputerName</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>RemoteAddress</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>InterfaceAlias</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>SourceAddress</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>PingSucceeded</PropertyName>
+              </TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+    </ViewDefinitions>
+</Configuration>
+
+
