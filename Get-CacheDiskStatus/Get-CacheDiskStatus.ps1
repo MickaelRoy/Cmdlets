@@ -4,38 +4,38 @@
 
         Checks the bind list of drives against the cache devices.
 
-	.DESCRIPTION
-    
-		Get-CacheDiskStatus is a script that can be used to verify the bindings of cache devices in Storage Spaces Direct.
+    .DESCRIPTION
 
-	.PARAMETER ClusterName
-        	
-		Specifies the file Cluster name.
+        Get-CacheDiskStatus is a script that can be used to verify the bindings of cache devices in Storage Spaces Direct.
+
+    .PARAMETER ClusterName
+
+        Specifies the file Cluster name.
 
     .EXAMPLE
 
-		Get-CacheDiskStatus -ClusterName Clus001
-	
-	.INPUTS
+        Get-CacheDiskStatus -ClusterName Clus001
 
-	        None. You cannot pipe objects to Add-Extension.
- 
-	.NOTES
- 
-		Author: Darryl van der Peijl
-		Website: http://www.DarrylvanderPeijl.nl/
-		Email: DarrylvanderPeijl@outlook.com
-		Date created: 3.january.2018
-		Last modified: 25.july.2022
-		Modified by: Mickael ROY
-		Version: 1.2
+    .INPUTS
 
- 
-	.LINK
-    
-		http://www.DarrylvanderPeijl.nl/
-		https://mickaelroy.starprince.fr/
-		
+        None. You cannot pipe objects to Add-Extension.
+
+    .NOTES
+
+        Author: Darryl van der Peijl
+        Website: http://www.DarrylvanderPeijl.nl/
+        Email: DarrylvanderPeijl@outlook.com
+        Date created: 3.january.2018
+        Last modified: 25.july.2022
+        Modified by: Mickael ROY
+        Version: 1.2
+
+
+    .LINK
+
+        http://www.DarrylvanderPeijl.nl/
+        https://mickaelroy.starprince.fr/
+
 #>
     Param (
         [parameter(Position=0, Mandatory=$true)]
@@ -102,7 +102,7 @@ Function Get-PCStorageReportSSBCache {
 
             ##
             # Parse cluster log for the SBL Disk section
-            ## 
+            ##
 
             $sr = [System.IO.StreamReader]$_.FullName
 
@@ -110,7 +110,7 @@ Function Get-PCStorageReportSSBCache {
             $parse = $false
             $(Do {
                 $l = $sr.ReadLine()
-        
+
                 # Heuristic ...
                 # SBL Disks comes before System
 
@@ -128,7 +128,7 @@ Function Get-PCStorageReportSSBCache {
                 } ElseIf ($l -match '^\[=== System') {
                     break
                 }
-        
+
             } While (-not $sr.EndOfStream)) > $csvf
 
             ##
@@ -147,7 +147,7 @@ Function Get-PCStorageReportSSBCache {
                     $idmap[$_.DiskId] = $_.DeviceNumber
                 }
 
-                
+
                 $d | Select-Object @{ Label = 'DiskState'; Expression = { $_.DiskState.TrimStart('CacheDiskState') }},
                     DiskId, @{Label = 'DeviceNumber' ; Expression = {[Int]$_.DeviceNumber}},@{
                     Label = 'CacheDeviceNumber'; Expression = {
@@ -163,7 +163,7 @@ Function Get-PCStorageReportSSBCache {
                         }
                     }
                 },HasSeekPenalty,PathId,BindingAttributes,DirtyPages | Sort-Object IsSblCacheDevice,CacheDeviceId,DiskState,DeviceNumber | Format-Table -AutoSize
-                
+
 
                 ##
                 # Now do basic testing of device counts
@@ -173,7 +173,7 @@ Function Get-PCStorageReportSSBCache {
                 $dcap = $d | Where-Object IsSblCacheDevice -NE 'true'
 
                 Write-Output ( [string]::Format(“Device counts: `n`tCache: {0} `n`tCapacity: {1}”,@($dcache).count,@($dcap).count) )
-        
+
                 ##
                 # Test cache bindings if we do have cache present
                 ##
@@ -254,9 +254,10 @@ Function Get-PCStorageReportSSBCache {
 }
 
     FailoverClusters\Get-ClusterNode -Cluster $ClusterName | ForEach-Object {
-    
+
         Invoke-Command -ComputerName $_ -ScriptBlock ${Function:Get-PCStorageReportSSBCache}
-    
+
     }
 
 }
+    
