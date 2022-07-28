@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>  
+    <ViewDefinitions>
+        <View>
+            <Name>Default</Name>
+            <ViewSelectedBy>
+                <TypeName>ToolSet.PrettyPool</TypeName>
+            </ViewSelectedBy>
+            <TableControl>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Width>15</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Width>8</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Width>30</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                    <Label>Size</Label>
+                        <Width>8</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                    <Label>Used</Label>
+                        <Width>8</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                    <Label>Percent</Label>
+                        <Width>8</Width>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Node</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Type</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>SerialNumber</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                              <Alignment>Right</Alignment>
+                                <scriptblock>
+                                    [int64]$byteCount = [int64]$_.Size
+                                    $suf = @( " B", " KB", " MB", " GB", " TB", " PB", " EB" )
+                                    if ($byteCount -eq 0) {
+                                        return "0" + $suf[0]
+                                    }
+                                    [long]$bytes = [Math]::Abs($byteCount)
+                                    [int]$place = [Convert]::ToInt32([Math]::Floor([Math]::Log($bytes, 1024)))
+                                    [double]$num = [Math]::Round($bytes / [Math]::Pow(1024, $place), 1)
+                                    return ([Math]::Sign($byteCount) * $num).ToString() + $suf[$place]
+                                </scriptblock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                              <Alignment>Right</Alignment>
+                                <scriptblock>
+                                    [int64]$byteCount = [int64]$_.Used
+                                    $suf = @( " B", " KB", " MB", " GB", " TB", " PB", " EB" )
+                                    if ($byteCount -eq 0) {
+                                        return "0" + $suf[0]
+                                    }
+                                    [long]$bytes = [Math]::Abs($byteCount)
+                                    [int]$place = [Convert]::ToInt32([Math]::Floor([Math]::Log($bytes, 1024)))
+                                    [double]$num = [Math]::Round($bytes / [Math]::Pow(1024, $place), 1)
+                                    return ([Math]::Sign($byteCount) * $num).ToString() + $suf[$place]
+                                </scriptblock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                              <Alignment>Right</Alignment>
+                                <scriptblock>
+                                    "{0:P}" -f ($_.Percent / 100)
+                                </scriptblock>
+                            </TableColumnItem>
+                         </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>  
+    </ViewDefinitions>
+</Configuration>
