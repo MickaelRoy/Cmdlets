@@ -9,8 +9,8 @@
         [Microsoft.ActiveDirectory.Management.ADUser]$Identity,
 
         [parameter(Mandatory=$False)]
-        [ValidateSet("WorkingDays", "NonWorkingDays")]
-        [String]$NonSelectedDaysare ="NonWorkingDays",
+        [ValidateSet("WorkingDays", "NonWorkingDays", "Ignored")]
+        [String]$NonSelectedDaysare ="Ignored",
 
         [parameter(Mandatory=$False)]
         [ValidateSet("Permitted", "Deny")]
@@ -40,8 +40,8 @@
      Process {
 
         Switch ($LogonPrecedence) {
-        "Permitted" { $Basis = 0 ; $Exc = 1 }
-        "Deny" { $Basis = 1 ; $Exc = 0 }
+            "Permitted" { $Basis = 0 ; $Exc = 1 }
+            "Deny" { $Basis = 1 ; $Exc = 0 }
         }
 
         $FullByte = [byte[]]::new(21)
@@ -54,6 +54,7 @@
         Switch ($PSBoundParameters["NonSelectedDaysare"]) {
             'NonWorkingDays' { $SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="000000000000000000000000" }
             'WorkingDays' { $SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="111111111111111111111111" }
+            'Ignored' { }
         }
         Switch ($PSBoundParameters.Keys) {
             'Sunday' { $SundayValue=$Working }
