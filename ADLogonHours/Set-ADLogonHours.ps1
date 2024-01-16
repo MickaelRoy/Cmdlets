@@ -41,7 +41,7 @@
 
         Switch ($LogonPrecedence) {
         "Permitted" { $Basis = 0 ; $Exc = 1 }
-        "Deny" { $Basis = 1 ; $Exc = 0  }
+        "Deny" { $Basis = 1 ; $Exc = 0 }
         }
 
         $FullByte = [byte[]]::new(21)
@@ -52,8 +52,8 @@
 
         $Working = -join ($FullDay.Values)
         Switch ($PSBoundParameters["NonSelectedDaysare"]) {
-            'NonWorkingDays' {$SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="000000000000000000000000"}
-            'WorkingDays' {$SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="111111111111111111111111"}
+            'NonWorkingDays' { $SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="000000000000000000000000" }
+            'WorkingDays' { $SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="111111111111111111111111" }
         }
         Switch ($PSBoundParameters.Keys) {
             'Sunday' { $SundayValue=$Working }

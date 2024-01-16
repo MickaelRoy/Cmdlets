@@ -29,10 +29,6 @@
                     $TimeZoneOffset1 = $AllTheWeek.SubString(168 - ((Get-TimeZone).BaseUtcOffset.Hours))
                     $FixedTimeZoneOffSet = "$TimeZoneOffset1$TimeZoneOffset"
                 }
-                
-                $BinaryResult = $FixedTimeZoneOffSet -split "(.)" -ne '' 
-
-                $i = 0
 
                 $ExportObj = [PSCustomObject]::new()
                 $ExportObj.psobject.properties.Add( [psnoteproperty]::new('Name', $User.Name) )
@@ -40,39 +36,37 @@
                 $ExportObj.psobject.properties.Add( [psnoteproperty]::new('UserPrincipalName', $User.UserPrincipalName) )
                 $ExportObj.psobject.properties.Add( [psnoteproperty]::new('DistinguishedName', $User.DistinguishedName) )
 
-                $ExportArray = For ($Inc = 0; $Inc -lt $BinaryResult.count; $Inc += 24) {
+                $BinaryResult = $FixedTimeZoneOffSet -split '(\d{24})' -ne ''
+
+                $Inc = 0
+                Foreach ($Result in $BinaryResult) {
+                    $Inc++
         
-                    $EndIndex = [int32]$Inc + 23
-
                     Switch ($Inc) {
-                        0 { $DayOfWeek = [dayofweek]::Sunday }
-                        24 { $DayOfWeek = [dayofweek]::Monday }
-                        48 { $DayOfWeek = [dayofweek]::Tuesday }
-                        72 { $DayOfWeek = [dayofweek]::Wednesday }
-                        96 { $DayOfWeek = [dayofweek]::Thursday }
-                        120 { $DayOfWeek = [dayofweek]::Friday }
-                        144 { $DayOfWeek = [dayofweek]::Saturday }
+                        1 { $DayOfWeek = [dayofweek]::Sunday }
+                        2 { $DayOfWeek = [dayofweek]::Monday }
+                        3 { $DayOfWeek = [dayofweek]::Tuesday }
+                        4 { $DayOfWeek = [dayofweek]::Wednesday }
+                        5 { $DayOfWeek = [dayofweek]::Thursday }
+                        6 { $DayOfWeek = [dayofweek]::Friday }
+                        7 { $DayOfWeek = [dayofweek]::Saturday }
                     }
-                    
+                    $Result = $Result -split '(.)' -ne ''
+
                     $LogonHours = [ordered]@{}
-                    For ($Hour = 0; $Hour -lt 24; $Hour++) {
-
-                        If ($Hour -eq 23) {$EndHour = 0}
-                        Else {$EndHour = $Hour + 1}
-
-                        Switch ($BinaryResult[$Hour]) {
-                            '1' {$LogonAuth = '1'}
-                            '0' {$LogonAuth = '0'}
-                        }
+                    For ($Hour = 0; $Hour -le 23; $Hour++) {
+                        $LogonAuth = $Result[$Hour]
                         [Void]$LogonHours.Add(("{0:d2}" -f $Hour), $LogonAuth)
                     }
                     $ExportObj.psobject.Properties.Add( [psnoteproperty]::new($DayOfWeek, $LogonHours) )
                 }
+
                 If (-not $Gui) {
                     Return $ExportObj
                 } Else {
+                    $ExportObj | Select *Name | Out-Default
                     $Week = $ExportObj.psobject.Properties.name -match ".*day$"
-                    Write-Host ("{0,-15}" -f "DayOfWeek") -NoNewline ; (00..23).ForEach({ Write-host $("{0:d2} " -f $_) -NoNewline })
+                    Write-Host ("{0,-15}" -f " ") -NoNewline ; (00..23).ForEach({ Write-host $("{0:d2} " -f $_) -NoNewline })
                     Write-Host `r
                     Foreach ($day in $week) {
                         Write-Host ("{0,-15}" -f $Day) -NoNewline
@@ -88,5 +82,8 @@
             Else { Write-Warning -Message "Logon hours is not the correct array size of 21 for: $_" }
         }
         Else { Write-Warning -Message "No logon hours were found on the input object: $_ `r`nPlease ensure you have included them using the -Properties parameter and logon hours have been defined" }
+    }
+    End {
+
     }
 }
