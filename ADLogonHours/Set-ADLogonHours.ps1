@@ -1,16 +1,17 @@
 ﻿Function Set-ADLogonHours {
      [CmdletBinding()]
      Param(
-        [Parameter(Mandatory=$True)]
-        [ValidateRange(0,23)]
-        $TimeIn24Format,
 
         [Parameter(Mandatory=$True,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True, Position=0)]
         [Microsoft.ActiveDirectory.Management.ADUser]$Identity,
 
+        [Parameter(Mandatory=$True)]
+        [ValidateRange(0,23)]
+        $TimeIn24Format,
+
         [parameter(Mandatory=$False)]
-        [ValidateSet("WorkingDays", "NonWorkingDays", "Ignored")]
-        [String]$NonSelectedDaysare ="Ignored",
+        [ValidateSet("WorkingDays", "NonWorkingDays")]
+        [String]$NonSelectedDaysare ="NonWorkingDays",
 
         [parameter(Mandatory=$False)]
         [ValidateSet("Permitted", "Deny")]
@@ -40,21 +41,20 @@
      Process {
 
         Switch ($LogonPrecedence) {
-            "Permitted" { $Basis = 0 ; $Exc = 1 }
-            "Deny" { $Basis = 1 ; $Exc = 0 }
+        "Permitted" { $Basis = 0 ; $Exc = 1 }
+        "Deny" { $Basis = 1 ; $Exc = 0 }
         }
 
         $FullByte = [byte[]]::new(21)
         $FullDay = [ordered]@{}
         0..23 | Foreach {$FullDay.Add($_,$Basis)}
 
-        $TimeIn24Format.ForEach({$FullDay[$_]=$Exc})
+        $TimeIn24Format.ForEach({$FullDay[$_] = $Exc})
 
         $Working = -join ($FullDay.Values)
         Switch ($PSBoundParameters["NonSelectedDaysare"]) {
             'NonWorkingDays' { $SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="000000000000000000000000" }
             'WorkingDays' { $SundayValue=$MondayValue=$TuesdayValue=$WednesdayValue=$ThursdayValue=$FridayValue=$SaturdayValue="111111111111111111111111" }
-            'Ignored' { }
         }
         Switch ($PSBoundParameters.Keys) {
             'Sunday' { $SundayValue=$Working }

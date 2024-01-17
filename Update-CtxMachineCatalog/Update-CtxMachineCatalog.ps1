@@ -6,14 +6,14 @@
         )]
 
         Param (
-            [Parameter(Mandatory=$false)]
-            [String[]]$DDCs = @('pwxendc102.boursorama.fr', 'pwxendc202.boursorama.fr'),
-
             [Parameter(Mandatory=$true)]
             $MachineCatalog,
 
             [Parameter(Mandatory=$false)]
             $MasterVM,
+
+            [Parameter(Mandatory=$false)]
+            [String[]]$DDCs = @('pwxendc102.boursorama.fr', 'pwxendc202.boursorama.fr'),
 
             [Parameter(Mandatory=$false)]
             [String] $vCenterUser = 'svc_vcenter_RO_Script_Snap',
