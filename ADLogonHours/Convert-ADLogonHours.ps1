@@ -40,8 +40,8 @@
 
                 $Inc = 0
                 Foreach ($Result in $BinaryResult) {
-
-                    $DayOfWeek = [System.DayOfWeek]$Inc
+                $Inc
+                    $DayOfWeek = [dayofweek]$Inc
         
                     $Result = $Result -split '(.)' -ne ''
 
@@ -65,8 +65,8 @@
                     Foreach ($day in $week) {
                         Write-Host ("{0,-15}" -f $Day) -NoNewline
                         $ExportObj.$day.Values.ForEach({ 
-                            If ($_ -eq 1) { Write-Host "  " -BackgroundColor Blue -ForegroundColor Blue -NoNewline ; Write-Host " " -NoNewline } 
-                            Else { Write-Host "  " -BackgroundColor DarkGray -ForegroundColor DarkGray -NoNewline ; Write-Host " " -NoNewline }
+                            If ($_ -eq 1) { Write-Host "  " -BackgroundColor Blue -NoNewline ; Write-Host " " -NoNewline } 
+                            Else { Write-Host "  " -BackgroundColor DarkGray -NoNewline ; Write-Host " " -NoNewline }
                             
                         })
                         Write-Host `r
@@ -79,5 +79,7 @@
     }
     End {
 
+        Write-Host "`n  " -BackgroundColor Blue -NoNewline ; Write-Host "`t`tPermitted"
+        Write-Host "  " -BackgroundColor DarkGray -NoNewline ; Write-Host "`t`tDenied"
     }
 }
