@@ -7,7 +7,30 @@
 
         [Switch] $Gui
     )
+    Begin {
+
+$msgTable = Data {
+    #culture="en-US"
+    ConvertFrom-StringData @'
+    warningMsg1 = Logon hours is not the correct array size of 21 for: {1}
+    warningMsg2 = No logon hours were found on the input object: {0}{1}Please ensure you have included them using the -Properties parameter and logon hours have been defined"
+    Sunday = Sun
+    Monday = Mon
+    Tuesday = Tue
+    Wednesday = Wed
+    Thursday = Thi
+    Friday = Fri
+    Saturday = Sat
+    Permitted = Permitted
+    Denied = Denied
+'@
+}
+
+Import-LocalizedData -BindingVariable msgTable
+
+    }
     Process {
+        
         $Properties = $User.PropertyNames
         If ($Properties -contains "logonhours") {
             If ($User.LogonHours.Count -eq 21) {
@@ -59,10 +82,10 @@
                 } Else {
                     $ExportObj | Select *Name | Out-Default
                     $Week = $ExportObj.psobject.Properties.name -match ".*day$"
-                    Write-Host ("{0,-15}" -f " ") -NoNewline ; (00..23).ForEach({ Write-host $("{0:d2} " -f $_) -NoNewline })
+                    Write-Host ("{0,-5}" -f " ") -NoNewline ; (00..23).ForEach({ Write-host $("{0:d2} " -f $_) -NoNewline })
                     Write-Host `r
                     Foreach ($day in $week) {
-                        Write-Host ("{0,-15}" -f $Day) -NoNewline
+                        Write-Host ("{0,-5}" -f $msgTable.$Day) -NoNewline
                         $ExportObj.$day.Values.ForEach({ 
                             If ($_ -eq 1) { Write-Host "  " -BackgroundColor Blue -NoNewline ; Write-Host " " -NoNewline } 
                             Else { Write-Host "  " -BackgroundColor DarkGray -NoNewline ; Write-Host " " -NoNewline }
@@ -72,13 +95,13 @@
                     }
                 }
             }
-            Else { Write-Warning -Message "Logon hours is not the correct array size of 21 for: $_" }
+            Else { Write-Warning -Message $($msgTable.warningMsg1 -f $_)}
         }
-        Else { Write-Warning -Message "No logon hours were found on the input object: $_ `r`nPlease ensure you have included them using the -Properties parameter and logon hours have been defined" }
+        Else { Write-Warning -Message $($msgTable.warningMsg2 -f $_, "`r`n") }
     }
     End {
 
-        Write-Host "`n  " -BackgroundColor Blue -NoNewline ; Write-Host "`t`tPermitted"
-        Write-Host "  " -BackgroundColor DarkGray -NoNewline ; Write-Host "`t`tDenied"
+        Write-Host "`n`t" -NoNewline ; Write-Host "  " -BackgroundColor Blue -NoNewline ; Write-Host "`t`t$($msgTable.Permitted)"
+        Write-Host "`t" -NoNewline ; Write-Host "  " -BackgroundColor DarkGray -NoNewline ; Write-Host "`t`t$($msgTable.Denied)"
     }
 }

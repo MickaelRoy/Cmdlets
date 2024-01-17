@@ -38,11 +38,22 @@
         [parameter(Mandatory=$false)]
         [switch]$Saturday
      )
+    Begin {
+    $msgTable = Data {
+    #culture="en-US"
+    ConvertFrom-StringData @'
+    SettingAccountMsg = Setting the Active Directory Account: 
+'@
+}
+
+Import-LocalizedData -BindingVariable msgTable
+    }
+
      Process {
 
         Switch ($LogonPrecedence) {
-        "Permitted" { $Basis = 0 ; $Exc = 1 }
-        "Deny" { $Basis = 1 ; $Exc = 0 }
+            "Permitted" { $Basis = 0 ; $Exc = 1 }
+            "Deny" { $Basis = 1 ; $Exc = 0 }
         }
 
         $FullByte = [byte[]]::new(21)
@@ -91,7 +102,7 @@
             $i++
         }
         
-        Write-Host "Paramètrage du compte sur l'AD: " -NoNewline
+        Write-Host $($msgTable.SettingAccount) -NoNewline
         Try {
             Set-ADUser -Identity $Identity -Replace @{logonhours = $FullByte} -ErrorAction Stop
             Write-Host "OK`n" -ForegroundColor Green
