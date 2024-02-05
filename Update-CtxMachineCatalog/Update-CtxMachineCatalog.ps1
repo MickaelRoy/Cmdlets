@@ -13,13 +13,13 @@
             $MasterVM,
 
             [Parameter(Mandatory=$false)]
-            [String[]]$DDCs = @('pwxendc102.boursorama.fr', 'pwxendc202.boursorama.fr'),
+            [String[]]$DDCs = @('xendc001.contoso.fr', 'xendc001.contoso.fr'),
 
             [Parameter(Mandatory=$false)]
             [String] $vCenterUser = 'svc_vcenter_RO_Script_Snap',
 
             [Parameter(Mandatory=$false)]
-            [String] $vCenterServer = 'pavcenter001.boursorama.fr', 
+            [String] $vCenterServer = 'vcenter.contoso.fr', 
 
             [Switch] $ForceSnapShot
         )
@@ -78,7 +78,7 @@
 
         If ($PSCmdlet.ShouldProcess("$MasterVM -> $MachineCatalog","Publication de l'image ?")) {
             Write-Host "Invocation de la publication... " -NoNewLine
-            $PubTask = Publish-ProvMasterVmImage -AdminAddress $AdminAddress -MasterImageVM $Snaps.FullPath -ProvisioningSchemeName $MachineCatalog -RunAsynchronously
+            $PubTask = Publish-ProvMasterVmImage -AdminAddress $AdminAddress -MasterImageVM $Snap.FullPath -ProvisioningSchemeName $MachineCatalog -RunAsynchronously
             Write-Host 'OK' -ForegroundColor Green
         }
         Return $PubTask
