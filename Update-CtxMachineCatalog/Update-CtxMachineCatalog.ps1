@@ -10,9 +10,6 @@
             $MachineCatalog,
 
             [Parameter(Mandatory=$false)]
-            $MasterVM,
-
-            [Parameter(Mandatory=$false)]
             [String[]]$DDCs = @('xendc001.contoso.fr', 'xendc001.contoso.fr'),
 
             [Parameter(Mandatory=$false)]
@@ -23,7 +20,6 @@
 
             [Switch] $ForceSnapShot
         )
-
 
     $ErrorActionPreference = 'Stop'
 
@@ -50,35 +46,35 @@
         Set-HypAdminConnection -AdminAddress $AdminAddress
         Write-Host "$AdminAddress sera notre interlocuteur..."
 
-        If ($null -eq $MasterVM) {
-            Write-Host "Déduction du Master Template relatif au MCA $MachineCatalog... " -NoNewline
-            $TempResult = Get-ProvScheme -AdminAddress $AdminAddress -ProvisioningSchemeUid (Get-BrokerCatalog -AdminAddress $AdminAddress -Name $MachineCatalog).ProvisioningSchemeId | Select-Object HostingUnitName, MasterImageVM
-            $MasterVM = $TempResult.MasterImageVM.Split('\')[3].Split('.')[0]
-            $HostingUnitName = $TempResult.HostingUnitName
-            Write-Host 'OK' -ForegroundColor Green
-            Write-Host "Il semble que le Golden Image soit $MasterVM"
-        }
+        Write-Host "Déduction du Master Template relatif au MCA $MachineCatalog... " -NoNewline
+        $TempResult = Get-ProvScheme -AdminAddress $AdminAddress -ProvisioningSchemeUid (Get-BrokerCatalog -AdminAddress $AdminAddress -Name $MachineCatalog).ProvisioningSchemeId | Select-Object HostingUnitName, MasterImageVM
+        $MasterVM = $TempResult.MasterImageVM.Split('\')[3].Split('.')[0]
+        $HostingUnitName = $TempResult.HostingUnitName
+        Write-Host 'OK' -ForegroundColor Green
+        Write-Host "Il semble que le Golden Image soit $MasterVM"
     
         $LatestSnapshot = Get-Snapshot -VM $MasterVM | Sort-Object Created -Descending | Select-Object Name, Created -First 1
         If ($null -eq $LatestSnapshot -or (([DateTime]::Now - [DateTime]$LatestSnapshot.Created).Days -gt 1) -or $ForceSnapShot) {
             Write-Host "Création du snapshot..." -NoNewline
             $NewSnapshotDescription = "Automated Snapshot completed by Update-MachineCatalog script. Initiated by: $env:USERNAME"
             $NewSnapshotName = "Citrix_XD_Automated_Deployement_$([DateTime]::Now.ToString("yyyy-MM-dd"))"
-            New-Snapshot -VM $MasterVM -Name $NewSnapshotName -Description $NewSnapshotDescription -Confirm:$false | Out-Null
+            $Snap = New-HypVMSnapshot -AdminAddress $AdminAddress -LiteralPath XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm -SnapshotName $NewSnapshotName -SnapshotDescription $NewSnapshotDescription
             Write-Host 'OK' -ForegroundColor Green
+            Write-Host "l'Id du snapshot est $($Snap.Id.Split('-')[-1])"
         }
-        $LatestSnapshot = Get-Snapshot -VM $MasterVM | Sort-Object Created -Descending | Select-Object Name, Id, Created -First 1
-        Write-Host "l'Id du snapshot est $($LatestSnapshot.Id.Split('-')[-1])"
 
-        Write-Host "Recherche du snapshot pour le présenter lors du provisionnement... " -NoNewLine
-        Write-Verbose -Message "Recherche dans: XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm"
-        $Snaps = Get-ChildItem -Recurse -Path XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm
-        $Snap = $Snaps | Where-Object Id -Match ".*$($LatestSnapshot.Id.Split('-')[-1])$"
-        Write-Host 'OK' -ForegroundColor Green
+        If ($null -eq $Snap) {
+            Write-Host "Recherche du snapshot pour le présenter lors du provisionnement... " -NoNewLine
+            Write-Verbose -Message "Recherche dans: XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm"
+            $Snaps = Get-ChildItem -Recurse -Path XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm
+            $Snap = $Snaps[-1].PSPath
+            Write-Host 'OK' -ForegroundColor Green
+            Write-Host "l'Id du snapshot est $($Snaps[-1].Id.Split('-')[-1])"
+        } 
 
         If ($PSCmdlet.ShouldProcess("$MasterVM -> $MachineCatalog","Publication de l'image ?")) {
             Write-Host "Invocation de la publication... " -NoNewLine
-            $PubTask = Publish-ProvMasterVmImage -AdminAddress $AdminAddress -MasterImageVM $Snap.FullPath -ProvisioningSchemeName $MachineCatalog -RunAsynchronously
+            $PubTask = Publish-ProvMasterVmImage -AdminAddress $AdminAddress -MasterImageVM $Snap -ProvisioningSchemeName $MachineCatalog -RunAsynchronously
             Write-Host 'OK' -ForegroundColor Green
         }
         Return $PubTask
@@ -88,5 +84,4 @@
         Write-Host 'NOK' -ForegroundColor Red
         Throw $_
     }
-
 }
