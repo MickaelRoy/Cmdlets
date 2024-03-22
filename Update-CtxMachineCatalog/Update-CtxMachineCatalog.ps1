@@ -79,7 +79,6 @@
             $NewSnapshotName = "Citrix_XD_Automated_Deployement_$([DateTime]::Now.ToString("yyyy-MM-dd"))"
             $Snap = New-HypVMSnapshot -AdminAddress $AdminAddress -LiteralPath XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm -SnapshotName $NewSnapshotName -SnapshotDescription $NewSnapshotDescription
             Write-Host 'OK' -ForegroundColor Green
-            
         }
        
         If ([String]::IsNullOrEmpty($Snap)) {
@@ -89,7 +88,6 @@
             $Snap = $Snaps[-1].PSPath
             Write-Host 'OK' -ForegroundColor Green
             Write-Host "L'Id du snapshot est $($Snaps[-1].Id.Split('-')[-1])"
-
         } 
 
         If ($PSCmdlet.ShouldProcess("$MachineCatalog","Publication de l'image $MasterVM ?")) {
@@ -100,7 +98,8 @@
         Return $PubTask
 
     } Catch {
-
         Write-Host 'NOK' -ForegroundColor Red
         Throw $_
-    }}
+    }
+   
+}
