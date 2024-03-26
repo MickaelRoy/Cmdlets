@@ -49,7 +49,7 @@
             If ($PSBoundParameters.ContainsKey('vCenterUser')) {
                 $vCenterConnectionParameter.User = $vCenterUser
             }
-            $vCenterConnection = Connect-VIServer $vCenterServer -User $vCenterUser
+            $vCenterConnection = Connect-VIServer @vCenterConnectionParameter
             Write-Host 'OK' -ForegroundColor Green
         }
 
