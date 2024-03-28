@@ -19,7 +19,7 @@
     .PARAMETER vCenterServer
     Spécifie le nom du serveur vCenter auquel se connecter.
 
-    .SWITCH ForceSnapShot
+    .PARAMETER ForceSnapShot
     Indique si un nouveau snapshot doit être créé, même s'il existe déjà un snapshot récent.
 
     .INPUTS
