@@ -1,4 +1,42 @@
 ﻿Function Update-CtxMachineCatalog {
+<#
+    .SYNOPSIS
+    Met à jour un catalogue de machines Citrix avec les dernières modifications de l'image maître.
+
+    .DESCRIPTION
+    La fonction Update-CtxMachineCatalog met à jour un catalogue de machines Citrix avec les dernières modifications de l'image maître.
+    Elle crée un snapshot de l'image maître si nécessaire, puis le publie dans le catalogue de machines spécifié.
+
+    .PARAMETER MachineCatalog
+    Spécifie le nom du catalogue de machines à mettre à jour.
+
+    .PARAMETER DDCs
+    Spécifie les contrôleurs de livraison Citrix auxquels se connecter pour effectuer la mise à jour.
+
+    .PARAMETER vCenterUser
+    Spécifie le nom de l'utilisateur à utiliser pour se connecter au serveur vCenter.
+
+    .PARAMETER vCenterServer
+    Spécifie le nom du serveur vCenter auquel se connecter.
+
+    .SWITCH ForceSnapShot
+    Indique si un nouveau snapshot doit être créé, même s'il existe déjà un snapshot récent.
+
+    .INPUTS
+    Aucune entrée requise. Vous devez spécifier les paramètres requis.
+
+    .OUTPUTS
+    System.Object
+    La fonction renvoie un objet contenant les détails de la tâche de publication.
+
+    .EXAMPLE
+    Update-CtxMachineCatalog -MachineCatalog "Catalogue1" -DDCs "pwxendc102.boursorama.fr", "pwxendc202.boursorama.fr"
+    Met à jour le catalogue de machines "Catalogue1" en utilisant les contrôleurs de livraison spécifiés.
+
+    .NOTES
+    Auteur : Mickael ROY
+    Date de création : 28/03.2024
+#>
         [CmdletBinding(
             SupportsShouldProcess=$true,
             HelpUri = 'https://support.citrix.com/article/CTX129205',
@@ -23,7 +61,7 @@
 
     $ErrorActionPreference = 'Stop'
 
-   Try {
+    Try {
         
         If (-not (Get-Module VMware.VimAutomation.Core)) {
             Write-Host 'Chargement du module VMware.VimAutomation.Core...' -NoNewline
