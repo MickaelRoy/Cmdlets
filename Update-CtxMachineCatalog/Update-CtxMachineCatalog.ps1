@@ -82,7 +82,7 @@
         If ($null -eq $global:defaultviserver) {
             Write-Host 'Connexion au vCenter... ' -NoNewline
             $vCenterConnectionParameter = @{
-                vCenterServer = $vCenterServer
+                Server = $vCenterServer
             }
             If ($PSBoundParameters.ContainsKey('vCenterUser')) {
                 $vCenterConnectionParameter.User = $vCenterUser
@@ -116,17 +116,16 @@
             $NewSnapshotDescription = "Automated Snapshot completed by Update-MachineCatalog script. Initiated by: $env:USERNAME"
             $NewSnapshotName = "Citrix_XD_Automated_Deployement_$([DateTime]::Now.ToString("yyyy-MM-dd"))"
             $Snap = New-HypVMSnapshot -AdminAddress $AdminAddress -LiteralPath XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm -SnapshotName $NewSnapshotName -SnapshotDescription $NewSnapshotDescription
-            Write-Host 'OK' -ForegroundColor Green
-        }
-       
-        If ([String]::IsNullOrEmpty($Snap)) {
+            Write-Host ' OK' -ForegroundColor Green
+        } Else {
+            Write-Host "L'Id du snapshot est $($LatestSnapshot.Id.Split('-')[-1])."
             Write-Host "Recherche du snapshot pour le présenter lors du provisionnement... " -NoNewLine
             Write-Verbose -Message "Recherche dans: XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm"
             $Snaps = Get-ChildItem -Recurse -Path XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm
             $Snap = $Snaps[-1].PSPath
             Write-Host 'OK' -ForegroundColor Green
-            Write-Host "L'Id du snapshot est $($Snaps[-1].Id.Split('-')[-1])"
-        } 
+        }
+
 
         If ($PSCmdlet.ShouldProcess("$MachineCatalog","Publication de l'image $MasterVM ?")) {
             Write-Host "Invocation de la publication... " -NoNewLine
