@@ -30,7 +30,7 @@
     La fonction renvoie un objet contenant les détails de la tâche de publication.
 
     .EXAMPLE
-    Update-CtxMachineCatalog -MachineCatalog "Catalogue1" -DDCs "pwxendc102.boursorama.fr", "pwxendc202.boursorama.fr"
+    Update-CtxMachineCatalog -MachineCatalog "Catalogue1"
     Met à jour le catalogue de machines "Catalogue1" en utilisant les contrôleurs de livraison spécifiés.
 
     .NOTES
@@ -82,12 +82,12 @@
         If ($null -eq $global:defaultviserver) {
             Write-Host 'Connexion au vCenter... ' -NoNewline
             $vCenterConnectionParameter = @{
-                vCenterServer = $vCenterServer
+                Server = $vCenterServer
             }
             If ($PSBoundParameters.ContainsKey('vCenterUser')) {
                 $vCenterConnectionParameter.User = $vCenterUser
             }
-            $vCenterConnection = Connect-VIServer $vCenterServer -User $vCenterUser
+            $vCenterConnection = Connect-VIServer @vCenterConnectionParameter
             Write-Host 'OK' -ForegroundColor Green
         }
 
@@ -102,8 +102,8 @@
         }
         Write-Host "$global:AdminAddress est notre interlocuteur..."
         
-        Write-Host "Déduction du Master Template relatif au MCA $MachineCatalog... " -NoNewline
-        $TempResult = Get-ProvScheme -AdminAddress $AdminAddress -ProvisioningSchemeUid (Get-BrokerCatalog -AdminAddress $AdminAddress -Name $MachineCatalog).ProvisioningSchemeId | Select-Object HostingUnitName, MasterImageVM
+        Write-Host "Déduction du Master Template relatif au MCA $CatalogName... " -NoNewline
+        $TempResult = Get-ProvScheme -AdminAddress $AdminAddress -ProvisioningSchemeUid (Get-BrokerCatalog -AdminAddress $AdminAddress -Name $CatalogName).ProvisioningSchemeId | Select-Object HostingUnitName, MasterImageVM
         $MasterVM = $TempResult.MasterImageVM.Split('\')[3].Split('.')[0]
         $HostingUnitName = $TempResult.HostingUnitName
         Write-Host 'OK' -ForegroundColor Green
@@ -132,9 +132,9 @@
             Write-Host "L'Id du snapshot est $($Snaps[-1].Id.Split('-')[-1])"
         } 
 
-        If ($PSCmdlet.ShouldProcess("$MachineCatalog","Publication de l'image $MasterVM ?")) {
+        If ($PSCmdlet.ShouldProcess("$CatalogName","Publication de l'image $MasterVM ?")) {
             Write-Host "Invocation de la publication... " -NoNewLine
-            $PubTask = Publish-ProvMasterVmImage -AdminAddress $AdminAddress -MasterImageVM $Snap -ProvisioningSchemeName $MachineCatalog -RunAsynchronously
+            $PubTask = Publish-ProvMasterVmImage -AdminAddress $AdminAddress -MasterImageVM $Snap -ProvisioningSchemeName $CatalogName -RunAsynchronously
             Write-Host 'OK' -ForegroundColor Green
         }
         Return $PubTask

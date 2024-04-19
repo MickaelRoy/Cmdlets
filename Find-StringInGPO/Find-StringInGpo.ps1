@@ -6,8 +6,8 @@
 .DESCRIPTION
     La fonction `Find-StringInGpo` permet de rechercher une chaîne spécifique dans les objets de Stratégie de Groupe (GPO) de votre environnement Active Directory. Elle peut effectuer une recherche dans tous les GPOs de votre domaine ou dans un emplacement de recherche spécifié.
 
-.PARAMETER String
-    La chaîne de caractères à rechercher dans les objets GPO.
+.PARAMETER Pattern
+    Spécifie le texte a rechercher, une chaîne de caractères ou une expression régulière.
 
 .PARAMETER All
     Indique si la recherche doit être effectuée dans tous les GPOs du domaine. Si cette option est spécifiée, la fonction recherche dans tous les GPOs du domaine actuel. Cet argument est un commutateur, il n'accepte pas de valeur.
@@ -30,16 +30,17 @@
 .NOTES
     Auteur : Mickael ROY
     Date : 26/06/2023
-    Dernière modification : 28/03/2024
+    Dernière modification : 19/04/2024
 
 .LINK
     Lien de l'aide : https://docs.microsoft.com/fr-fr/powershell/module/grouppolicy/?view=windowsserver2022-ps
 
 #>
-    [CmdletBinding(DefaultParameterSetName = 'All')]
+    [CmdletBinding()]
     Param (
         [Parameter(Mandatory=$true,Position=0)]
-        [String] $String,
+        [Alias("String")]
+        [String] $Pattern,
 
         [Parameter(ParameterSetName ='All')]
         [Switch] $All,
@@ -52,7 +53,7 @@
 
     If ($All) {
         # Set the domain to search for GPOs 
-        $DomainName = $env:USERDNSDOMAIN 
+        $DomainName = $env:USERDNSDOMAIN.ToLower()
         
         # Find all GPOs in the current domain 
         Write-Host "Finding all the GPOs in $DomainName" 
@@ -62,34 +63,47 @@
         $allGpos = (Get-GPInheritance -Target $SearchBase).InheritedGpoLinks
     }
 
-
-    [String[]] $MatchedGPOList = @()
-
     # Look through each GPO's XML for the string 
     Write-Host "Starting search.... " -NoNewline
-    Foreach ($gpo in $allGpos) {
+    $Objects = [System.Collections.ArrayList]::new()
 
+    #This Line is useless in a powershell module context. 
+    Update-FormatData -PrependPath .\Formats\Brs.GpoString.Format.ps1xml
+    $i = 0
+    Foreach ($gpo in $allGpos) {
+        $Lines = $null
         If ($All) {
             $GpoId = $Gpo.Id
         } Else {
-            $GpoId = $Gpo.GpoId
+            $GpoId = $Gpo.GpoId.Guid
         }
-
-        $report = Get-GPOReport -Guid $GpoId -ReportType Xml 
-        If ($report -match $string) {
-            If($i) { $iLength = $i.tostring().length }
+        Try {
+            $report = Get-GPOReport -Guid $GpoId -ReportType Xml -ErrorAction Stop
+        } Catch {
+            Write-Warning -Message "Impossible de lire la GPO `'$GpoId`', vous n'avez peut être pas les droits."
+        }
+        $Lines = $report.Split("`n") -match $Pattern
+        $Lines = $Lines -notmatch "^<.*\sxmlns"
+        If (-not[String]::IsNullOrEmpty($Lines)) {
+            If ($i) { $iLength = $i.tostring().length }
             Write-Host ("`b" * $iLength) -NoNewline
-            Write-Verbose "********** Match found in: $($gpo.DisplayName) **********"
-            $MatchedGPOList += "$($gpo.DisplayName)"
+            $Object = [PsCustomObject]@{ 
+                GroupPolicy = $($gpo.DisplayName)
+                Strings  = $Lines.Trim()
+            }
+            $Object.PsTypeNames.Insert(0,'Brs.GpoString')
+
+            [Void]$Objects.Add($Object)
             $i++
             Write-Host "$i" -NoNewline
         }
     } # end foreach
     
-    If ($MatchedGPOList) {
+    If ($Objects) {
+
         $iLength = $i.tostring().length
         Write-Host ("`b" * $iLength) -NoNewline
         Write-Host "Found ($i) !`r`n" -ForegroundColor Green
-        Return $MatchedGPOList
+        Return $Objects
     }
 }
