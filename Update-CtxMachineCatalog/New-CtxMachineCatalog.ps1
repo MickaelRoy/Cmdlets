@@ -30,9 +30,10 @@
     Crée un Machine Catalog nommé "MonCatalogue" avec l'image maître "MonImageMaître" sur l'unité d'hébergement "MonHébergement". Il crée 5 machines virtuelles et les associe aux contrôleurs de livraison "xendc001.contoso.fr" et "xendc002.contoso.fr".
 
     .NOTES
-    Auteur : [Votre nom]
-    Date : [Date de création/modification]
-    Version : [Numéro de version]
+        Auteur: Mickael Roy
+        Site Web: mickaelroy.starprince.fr
+        Date de création: 30/04/2024
+        Dernière modification: 30/04/2024
 
     .LINK
     Lien vers la documentation Citrix PowerShell : https://www.citrix.com/blogs/2012/03/06/using-powershell-to-create-a-catalog-of-machine-creations-services-machines/
@@ -119,14 +120,14 @@
         Write-Host "Création du machine catalog: " -NoNewline
         $numVMsToCreate = $Count
         $hostConnection = $HostingUnitPath.hypervisorConnection
-        $brokerHypConnection = Get-BrokerHypervisorConnection -AdminAddress $adminAddress -HypHypervisorConnectionUid $hostConnection.HypervisorConnectionUid
+        $brokerHypConnection = Get-BrokerHypervisorConnection -AdminAddress $AdminAddress -HypHypervisorConnectionUid $hostConnection.HypervisorConnectionUid
 
-        $catalog = New-BrokerCatalog -Name $CatalogName -AllocationType Random -ProvisioningType MCS -AdminAddress $adminAddress -MinimumFunctionalLevel LMAX -PersistUserChanges Discard -SessionSupport MultiSession
+        $catalog = New-BrokerCatalog -Name $CatalogName -AllocationType Random -ProvisioningType MCS -AdminAddress $AdminAddress -MinimumFunctionalLevel LMAX -PersistUserChanges Discard -SessionSupport MultiSession
         Write-Host "OK" -ForegroundColor Green
 
         If ([String]::IsNullOrEmpty($NamingScheme)) {
             Write-Host "Définition du préfix: " -NoNewline
-            $NamingScheme = New-NamingScheme -CatalogName $CatalogName
+            $NamingScheme = New-NamingScheme -CatalogName $CatalogName -AdminAddress $AdminAddress
             Write-Host " $($NamingScheme.ToLower())" -ForegroundColor Green
         } Else { Write-Host "Vous avec spécifié un préfix tel que: $($NamingScheme.ToLower())" }
 
@@ -136,7 +137,7 @@
         $Domain = (Get-ADDomain).DNSRoot
 
         Write-Host "Création du Identity Pool: " -NoNewline
-        $adPool = New-AcctIdentityPool -IdentityPoolName $CatalogName -NamingScheme $($NamingScheme.ToLower()) -NamingSchemeType Numeric -OU $OU -Domain $Domain -AllowUnicode -AdminAddress $adminAddress
+        $adPool = New-AcctIdentityPool -IdentityPoolName $CatalogName -NamingScheme $($NamingScheme.ToLower()) -NamingSchemeType Numeric -OU $OU -Domain $Domain -AllowUnicode -AdminAddress $AdminAddress
         Write-Host "OK" -ForegroundColor Green
         
         Write-Host "Création du snapshot: " -NoNewline
@@ -147,11 +148,11 @@
 
         Write-Host "Création schéma de provisionnement: " -NoNewline
         If ((Test-ProvSchemeNameAvailable -ProvisioningSchemeName $CatalogName).Available) {
-            $provSchemeTaskID = New-ProvScheme -ProvisioningSchemeName $CatalogName -HostingUnitUID $HostingUnitPath.HostingUnitUID -IdentityPoolUID $adpool.IdentityPoolUid -VMCpuCount $ConfDataForVM.CpuCount -VMMemoryMB $ConfDataForVM.MemoryMB -CleanOnBoot -MasterImageVM $Snap -RunAsynchronously -AdminAddress $adminAddress
+            $provSchemeTaskID = New-ProvScheme -ProvisioningSchemeName $CatalogName -HostingUnitUID $HostingUnitPath.HostingUnitUID -IdentityPoolUID $adpool.IdentityPoolUid -VMCpuCount $ConfDataForVM.CpuCount -VMMemoryMB $ConfDataForVM.MemoryMB -CleanOnBoot -MasterImageVM $Snap -RunAsynchronously -AdminAddress $AdminAddress
         } Else {
             Throw "Nom du Schéma de provisionnement indisponible."
         }
-        $ProvTask = Get-ProvTask -TaskID $provSchemeTaskID -AdminAddress $adminAddress
+        $ProvTask = Get-ProvTask -TaskID $provSchemeTaskID -AdminAddress $AdminAddress
         $iLength = 0
         While ($provTask.Active){
             If ($provTask.TaskProgress -le 100){
@@ -159,7 +160,7 @@
                 $iLength = "$($provTask.TaskProgress)%".Length
                 Write-Host "$($provTask.TaskProgress)`%" -NoNewline
             }
-            $ProvTask = Get-ProvTask -TaskID $provSchemeTaskID -AdminAddress $adminAddress
+            $ProvTask = Get-ProvTask -TaskID $provSchemeTaskID -AdminAddress $AdminAddress
             Start-Sleep 1
             
         }
@@ -178,23 +179,23 @@
         Write-Host "OK" -ForegroundColor Green
 
         Write-Host "Création des comptes ordinateurs: " -NoNewline
-        $accts = New-AcctADAccount -IdentityPoolUid $adPool.IdentityPoolUid -Count $numVMsToCreate -AdminAddress $adminAddress
+        $accts = New-AcctADAccount -IdentityPoolUid $adPool.IdentityPoolUid -Count $numVMsToCreate -AdminAddress $AdminAddress
         Write-Host "OK" -ForegroundColor Green
 
         Write-Host "Provisionnement des machines virtuelles: " -NoNewline
         $provVMTaskID = New-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -ADAccountName $accts.SuccessfulAccounts -RunAsynchronously -AdminAddress $AdminAddress
         # wait for the VMS tp finish Provisioning
-        $ProvTask = Get-ProvTask -TaskID $provVMTaskID
+        $ProvTask = Get-ProvTask -TaskID $provVMTaskID -AdminAddress $adminAddress
 
         $jLength = 0
         While ($provTask.Active -eq $true){
             If ($provTask.CreatedVirtualMachines.Count -le $numVMsToCreate) {
-                $ProvTask = Get-ProvTask -TaskID $provVMTaskID
                 Write-Host ("`b" * $jLength) -NoNewline
                 $jLength = "$($provTask.CreatedVirtualMachines.Count)".Length
                 Write-Host "$($provTask.CreatedVirtualMachines.Count)" -NoNewline
                 Start-Sleep 1
             }
+            $ProvTask = Get-ProvTask -TaskID $provVMTaskID -AdminAddress $AdminAddress
         }
         If ($null -ne $ProvTask.TerminatingError) { 
             Throw $ProvTask.TerminatingError
@@ -209,9 +210,9 @@
 
         # Lock the VMs and add them to the broker Catalog
         Write-Host "Ajout des machines dans le Machine Catalog: "
-        $provisionedVMs = Get-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -AdminAddress $adminAddress
-        $provisionedVMs | Lock-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -Tag Brokered -AdminAddress $adminAddress
-        $provisionedVMs | ForEach-Object { New-BrokerMachine  -CatalogUid $catalog.UID -HostedMachineId $_.VMId -HypervisorConnectionUid $brokerHypConnection.UID -MachineName $_.ADAccountSid -AdminAddress $adminAddress }
+        $provisionedVMs = Get-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -AdminAddress $AdminAddress
+        $provisionedVMs | Lock-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -Tag Brokered -AdminAddress $AdminAddress
+        $provisionedVMs | ForEach-Object { New-BrokerMachine  -CatalogUid $catalog.UID -HostedMachineId $_.VMId -HypervisorConnectionUid $brokerHypConnection.UID -MachineName $_.ADAccountSid -AdminAddress $AdminAddress }
         Write-Host "OK" -ForegroundColor Green
 
         If ($PSCmdlet.ShouldProcess("$CatalogName","Publication de l'image $MasterVM ?")) {
