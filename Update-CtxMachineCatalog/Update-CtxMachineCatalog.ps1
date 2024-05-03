@@ -81,15 +81,19 @@
                 Write-Host 'OK' -ForegroundColor Green
             }
 
-            Write-Host 'Chargement du PSSnapin Citrix... ' -NoNewline
-            @('Citrix.Host.Admin.V2', 'Citrix.Broker.Admin.V2', 'Citrix.MachineCreation.Admin.V2').ForEach({
-                If ( $null -eq  (Get-PSSnapin $_ -ErrorAction SilentlyContinue)) { 
-                    Add-PSSnapin $_
-                    $i++
-                    Write-Host " $i" -ForegroundColor Green -NoNewline
-                }
-            })
-            Write-Host ' OK' -ForegroundColor Green
+            Try {
+                $CitrixSnapin = Get-PSSnapin -Name Citrix*
+            } Catch {
+                Write-Host 'Chargement du PSSnapin Citrix... ' -NoNewline
+                @('Citrix.Host.Admin.V2', 'Citrix.Broker.Admin.V2', 'Citrix.MachineCreation.Admin.V2').ForEach({
+                    If ( $null -eq  (Get-PSSnapin $_ -ErrorAction SilentlyContinue)) { 
+                        Add-PSSnapin $_
+                        $i++
+                        Write-Host " $i" -ForegroundColor Green -NoNewline
+                    }
+                })
+                Write-Host ' OK' -ForegroundColor Green
+            }
        
             If ($null -eq $global:defaultviserver) {
                 Write-Host 'Connexion au vCenter... ' -NoNewline
@@ -111,8 +115,9 @@
 
                 $global:AdminAddress = $ConnectionTest1, $ConnectionTest2 | Where-Object TcpTestSucceeded | Get-Random | Select-Object -ExpandProperty ComputerName
                 Set-HypAdminConnection -AdminAddress $global:AdminAddress
+                Write-Host "$global:AdminAddress est notre interlocuteur..."
             }
-            Write-Host "$global:AdminAddress est notre interlocuteur..."
+            
 
         } Catch {
             Write-Host 'NOK' -ForegroundColor Red
@@ -123,6 +128,7 @@
     } Process {
 
         Foreach ($Catalog in $CatalogName) {
+            Remove-Variable snap, snaps, LatestSnapshot -ErrorAction SilentlyContinue
 
             Write-Host "Déduction du Master Template relatif au MCA $Catalog... " -NoNewline
             $TempResult = Get-ProvScheme -AdminAddress $AdminAddress -ProvisioningSchemeUid (Get-BrokerCatalog -AdminAddress $AdminAddress -Name $Catalog).ProvisioningSchemeId | Select-Object HostingUnitName, MasterImageVM
@@ -131,21 +137,25 @@
             Write-Host 'OK' -ForegroundColor Green
             Write-Host "Il semble que le Golden Image soit $MasterVM"
 
-            Get-ProvTask -AdminAddress $AdminAddress -Type PublishImage | Where-Object { ($_.HostingUnitName -eq $HostingUnitName) -and ($_.TaskStateInformation -eq "Terminated") } | ForEach-Object{
+            Get-ProvTask -AdminAddress $AdminAddress -Type PublishImage | Where-Object { ($_.HostingUnitName -eq $HostingUnitName) -and ($_.TaskStateInformation -eq "Terminated") } | ForEach-Object {
                 If (($_ | Remove-ProvTask) -eq "Success") { Write-Host "Previous provisioning task `'$($_.TaskId)`' supressed." -ForegroundColor Yellow }
             }
 
+            Write-Host "Recherche du dernier snapshot sur le vCenter... " -NoNewline
             $LatestSnapshot = Get-Snapshot -VM $MasterVM | Sort-Object Created -Descending | Select-Object Name, Id, Created -First 1
+            If ($LatestSnapshot) { Write-Host "OK" -ForegroundColor Green }
+            Else  {Write-Host "OK" -ForegroundColor Yellow }
+
             If ($null -eq $LatestSnapshot -or (([DateTime]::Now - [DateTime]$LatestSnapshot.Created).Days -gt $SnapshotRetentionDelay) -or $ForceSnapShot ) {
-                Write-Host "Création du snapshot..." -NoNewline
                 $NewSnapshotDescription = "Automated Snapshot completed by Update-MachineCatalog script. Initiated by: $env:USERNAME"
                 $NewSnapshotName = "Citrix_XD_Automated_Deployement_$([DateTime]::Now.ToString("yyyy-MM-dd"))"
+                Write-Host "Création du snapshot `"$NewSnapshotName`"..." -NoNewline
                 $Snap = New-HypVMSnapshot -AdminAddress $AdminAddress -LiteralPath XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm -SnapshotName $NewSnapshotName -SnapshotDescription $NewSnapshotDescription
                 Write-Host 'OK' -ForegroundColor Green
             }
-       
+            
             If ([String]::IsNullOrEmpty($Snap)) {
-                Write-Host "Recherche du snapshot pour le présenter lors du provisionnement... " -NoNewLine
+                Write-Host "Recherche du snapshot sur `"XDHyp:\hostingunits\$HostingUnitName`" pour le présenter lors du provisionnement... " -NoNewLine
                 Write-Verbose -Message "Recherche dans: XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm"
                 $Snaps = Get-ChildItem -Recurse -Path XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm
                 $Snap = $Snaps[-1].PSPath
