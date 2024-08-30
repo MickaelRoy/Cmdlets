@@ -325,17 +325,23 @@ Function Get-licenseServerVersion {
 }
 $licenseServerVersionLabel.Text = "Licence Server version: $(Get-licenseServerVersion)"
 
-Function Get-UDadminLocation {
+Try {
+    Function Get-UDadminLocation {
 
-    $keyPath = "HKLM:\SOFTWARE\WOW6432Node\Citrix\LicenseServer\Install"
-    $key = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
+        $keyPath = "HKLM:\SOFTWARE\WOW6432Node\Citrix\LicenseServer\Install"
+        $key = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
 
-    if ($key) {
-        Return "$($key.LS_Install_Dir)".ToString()
+        if ($key) {
+            Return "$($key.LS_Install_Dir)".ToString()
+        } Else {
+            Throw "UDadmin.exe est introuvable"
+        }
     }
+    $UDAdminLocation = Join-Path -Path $(Get-UDadminLocation) -ChildPath "udadmin.exe"
+    $udadminLocationLabel.Text = "UDadmin location: $([System.IO.Path]::GetDirectoryName($UDAdminLocation))"
+} Catch {
+    Throw $_
 }
-$UDAdminLocation = Join-Path -Path $(Get-UDadminLocation) -ChildPath "udadmin.exe"
-$udadminLocationLabel.Text = "UDadmin location: $([System.IO.Path]::GetDirectoryName($UDAdminLocation))"
 
 # Fonction pour analyser la sortie de la commande udadmin.exe
 function Update-UsageData {
