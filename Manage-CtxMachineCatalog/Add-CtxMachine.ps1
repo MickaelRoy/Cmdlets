@@ -1,4 +1,4 @@
-﻿Function Add-CtxMachines {
+﻿Function Add-CtxMachine {
 <#
     .SYNOPSIS
         Ajoute des machines au catalogue de machines et au groupe de livraison spécifiés.
@@ -16,7 +16,7 @@
         (Facultatif) Spécifie les contrôleurs de domaine à utiliser pour la connexion. Par défaut, utilise les contrôleurs de domaine 'xendc001.contoso.fr' et 'xendc002.contoso.fr'.
 
     .EXAMPLE
-        Add-CtxMachines -CatalogName "MyMachineCatalog" -DeliveryGroup "MyDeliveryGroup"
+        Add-CtxMachine -CatalogName "MyMachineCatalog" -DeliveryGroup "MyDeliveryGroup"
 
         Cette commande ajoute des machines au catalogue "MyMachineCatalog" et les associe au groupe de livraison "MyDeliveryGroup".
 
