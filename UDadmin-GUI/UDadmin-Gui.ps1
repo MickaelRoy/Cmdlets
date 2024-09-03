@@ -19,6 +19,7 @@ $Global:InUseVal = 0
 $Global:InstalledVal = 0
 $Global:InstalledOverdraftVal = 0
 $Global:updateLabelVal = "N/A"
+$Global:UsageData = $Null
 
 # Créer la fenêtre principale
 $form = New-Object System.Windows.Forms.Form
@@ -100,6 +101,7 @@ $userLabel.Text = "Users:"
 $userLabel.Location = New-Object System.Drawing.Point(70, 40)
 $userLabel.Size = New-Object System.Drawing.Size(80, 23)
 $userLabel.Font = [System.Drawing.Font]::new("Arial", 12, [System.Drawing.FontStyle]::Regular)
+$userLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
 $form.Controls.Add($userLabel)
 
 # Liste des utilisateurs
@@ -127,6 +129,8 @@ $releaseUserButton.Location = New-Object System.Drawing.Point(10, 450)
 $releaseUserButton.Size = New-Object System.Drawing.Size(180, 30)
 $releaseUserButton.Enabled = $false  # Désactiver par défaut
 $releaseUserButton.Font = [System.Drawing.Font]::new("Arial", 8, [System.Drawing.FontStyle]::Regular)
+$releaseUserButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+
 $form.Controls.Add($releaseUserButton)
 
 # --------- Colonne Périphériques ---------
@@ -170,7 +174,7 @@ $deviceLabel.Text = "Devices:"
 $deviceLabel.Location = New-Object System.Drawing.Point(270, 40)
 $deviceLabel.Size = New-Object System.Drawing.Size(80, 23)
 $deviceLabel.Font = [System.Drawing.Font]::new("Arial", 12, [System.Drawing.FontStyle]::Regular)
-
+$deviceLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
 $form.Controls.Add($deviceLabel)
 
 # Liste des périphériques
@@ -195,18 +199,47 @@ $form.Controls.Add($deviceListBox)
 $releaseDeviceButton = New-Object System.Windows.Forms.Button
 $releaseDeviceButton.Text = "Release Selected Device(s)"
 $releaseDeviceButton.Location = New-Object System.Drawing.Point(200, 450)
-$releaseDeviceButton.Size = New-Object System.Drawing.Size(180, 30)
+$releaseDeviceButton.Size = New-Object System.Drawing.Size(190, 30)
 $releaseDeviceButton.Font = [System.Drawing.Font]::new("Arial", 8, [System.Drawing.FontStyle]::Regular)
+$releaseDeviceButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $releaseDeviceButton.Enabled = $false  # Désactiver par défaut
 $form.Controls.Add($releaseDeviceButton)
 
 # --------- Colonne d'informations et de contrôle ---------
+$SelectEdtionLabel = New-Object System.Windows.Forms.Label
+$SelectEdtionLabel.Text = "Select XenDesktop Edition:"
+$SelectEdtionLabel.Location = New-Object System.Drawing.Point(400, 40)
+$SelectEdtionLabel.Size = New-Object System.Drawing.Size(160, 23)
+$SelectEdtionLabel.Font = [System.Drawing.Font]::new("Arial", 8, [System.Drawing.FontStyle]::Regular)
+$SelectEdtionLabel.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$SelectEdtionLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$SelectEdtionLabel.AutoSize = $true
+$SelectEdtionLabel.AutoEllipsis = $true
+$form.Controls.Add($SelectEdtionLabel)
+
+
+$Combobox = New-Object System.Windows.Forms.Combobox 
+$Combobox.Location = New-Object System.Drawing.Size(650,40) 
+$Combobox.Size = New-Object System.Drawing.Size(150,20)
+$Combobox.Font = [System.Drawing.Font]::new("Arial", 8, [System.Drawing.FontStyle]::Regular)
+
+$Combobox.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$Combobox.Hide()
+$Index = 0
+$Combobox.Add_SelectedIndexChanged({
+    $Index = $Combobox.SelectedIndex
+    Update-UsageData -Data $UsageData[$Index].Data
+})
+$form.Controls.Add($Combobox)
+
+
 # Cadre d'utilisation actuelle
 $currentUsageGroupBox = New-Object System.Windows.Forms.GroupBox
 $currentUsageGroupBox.Text = " Current Usage: "
 $currentUsageGroupBox.Location = New-Object System.Drawing.Point(400, 64)
 $currentUsageGroupBox.Size = New-Object System.Drawing.Size(400, 100)
 $currentUsageGroupBox.Font = [System.Drawing.Font]::new("Arial", 10, [System.Drawing.FontStyle]::Regular)
+$currentUsageGroupBox.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $form.Controls.Add($currentUsageGroupBox)
 
 # Champs d'utilisation
@@ -273,6 +306,7 @@ $refreshButton.Text = "Refresh"
 $refreshButton.Location = New-Object System.Drawing.Point(400, 450)
 $refreshButton.Size = New-Object System.Drawing.Size(100, 30)
 $refreshButton.Font = [System.Drawing.Font]::new("Arial", 8, [System.Drawing.FontStyle]::Regular)
+$refreshButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $form.Controls.Add($refreshButton)
 
 # Créer un objet ToolTip pour fournir des informations supplémentaires
@@ -306,7 +340,9 @@ $exitButton.Text = "Exit"
 $exitButton.Location = New-Object System.Drawing.Point(660, 450)
 $exitButton.Size = New-Object System.Drawing.Size(100, 30)
 $exitButton.Font = [System.Drawing.Font]::new("Arial", 8, [System.Drawing.FontStyle]::Regular)
+$exitButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $form.Controls.Add($exitButton)
+
 
 # Fonctionnalité du bouton Exit pour fermer l'application
 $exitButton.Add_Click({
@@ -325,47 +361,38 @@ Function Get-licenseServerVersion {
 }
 $licenseServerVersionLabel.Text = "Licence Server version: $(Get-licenseServerVersion)"
 
-Try {
-    Function Get-UDadminLocation {
+Function Get-UDadminLocation {
 
-        $keyPath = "HKLM:\SOFTWARE\WOW6432Node\Citrix\LicenseServer\Install"
-        $key = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
+    $keyPath = "HKLM:\SOFTWARE\WOW6432Node\Citrix\LicenseServer\Install"
+    $key = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
 
-        if ($key) {
-            Return "$($key.LS_Install_Dir)".ToString()
-        } Else {
-            Throw "UDadmin.exe est introuvable"
-        }
+    if ($key) {
+        Return "$($key.LS_Install_Dir)".ToString()
+    } Else {
+        Throw "Composant Citrix Licensing manquant."
     }
-    $UDAdminLocation = Join-Path -Path $(Get-UDadminLocation) -ChildPath "udadmin.exe"
+}
+$UDAdminLocation = Join-Path -Path $(Get-UDadminLocation) -ChildPath "udadmin.exe"
+If (Test-Path $UDAdminLocation) {
     $udadminLocationLabel.Text = "UDadmin location: $([System.IO.Path]::GetDirectoryName($UDAdminLocation))"
-} Catch {
-    Throw $_
+} Else {
+    Throw "UDadmin.exe introuvable."
 }
 
 # Fonction pour analyser la sortie de la commande udadmin.exe
-function Update-UsageData {
+Function Get-UsageData {
     # Exécuter la commande udadmin.exe
-    $udadminOutput = & $UDAdminLocation -list -times -a
+    $udadminOutput = & $UDAdminLocation -list -a
 
-    # Initialiser les compteurs
-    $totalUsers = 0
-    $totalDevices = 0
-    $totalInUse = 0
-    $totalInstalled = 0
-    $totalInstalledOverdraft = 0
-
-    # Variables pour stocker les utilisateurs et les devices
-    $usersList = @()
-    $devicesList = @()
-
-    # Analyser la sortie de la commande
+    $objects = [System.Collections.ArrayList]::new()
     foreach ($line in $udadminOutput) {
-        if ($line -match '^Usage data is.*') {
-            $updateLabelVal = $line
-        }
-        elseif ($line -match '^Feature\s+:\s+(\S+)') {
-            $feature = $matches[1] # Stocker la fonctionnalité trouvée
+        if ($line -match '^Feature\s+:\s+(\S+)') {
+            If ($feature -ne $matches[1]) {
+                Write-Verbose -Message "Nouvelle feature donc nouvel objet"
+                $feature = $matches[1] # Stocker la fonctionnalité trouvée
+                $object = [PsCustomObject] @{ Feature = $Feature }
+                $f++
+            }
         }
         elseif ($line -match '^Installed:\s+(\d+)\s+.*Installed Overdraft\s+:\s+(\d+)') {
             $totalInstalled = [int]$matches[1]
@@ -376,34 +403,75 @@ function Update-UsageData {
             $totalUsers = [int]$matches[2]
             $totalDevices = [int]$matches[3]
         }
-        elseif ($line -match '^\s+Users:\s*$') {
-            $currentList = "Users"
-        }
-        elseif ($line -match '^\s+Devices:\s*$') {
-            $currentList = "Devices"
-        }
-        elseif ($currentList -eq "Users" -and $line -match '^\s+(\w+)\s+\(') {
-            $usersList += $matches[1]
-        }
-        elseif ($currentList -eq "Devices" -and $line -match '^\s+(\S+)\s+\(') {
-            $devicesList += $matches[1]
-        }
+       
     }
+    $Data = [PsCustomObject] @{
+        TotalInstalled = $totalInstalled
+        TotalInstalledOverdraft = $totalInstalledOverdraft
+        TotalInUse = $totalInUse
+        TotalUsers = $totalUsers
+        TotalDevices = $totalDevices
+    }
+    $object | Add-Member -NotePropertyName Data -NotePropertyValue $Data
+    [Void]$objects.Add($object)
+    Return $objects
+}
 
-    # Mettre à jour les variables globales
-    $global:UsersVal = $totalUsers
-    $global:DevicesVal = $totalDevices
-    $global:InUseVal = $totalInUse
-    $global:InstalledVal = $totalInstalled
-    $global:InstalledOverdraftVal = $totalInstalledOverdraft
-    $global:updateLabelVal = $updateLabelVal
-    $global:feature = $feature
+function Get-Data {
+    # Exécuter la commande udadmin.exe
+    $udadminOutput = & $UDAdminLocation -list
 
-    # Mettre à jour les listes dans l'interface
-    $userListBox.Items.Clear()
-    $userListBox.Items.AddRange($usersList)
-    $deviceListBox.Items.Clear()
-    $deviceListBox.Items.AddRange($devicesList)
+    # Analyser la sortie de la commande
+    $object = [System.Collections.ArrayList]::new()
+
+    foreach ($line in $udadminOutput) {
+        if ($line -match '^Usage data is.*') {
+            $updateLabelVal = $line
+        }
+        elseif ($line -match '^Users:.*') {
+            $currentList = "Users"
+            "Users"
+        }
+        elseif ($line -match '^Devices:.*') {
+            $currentList = "Devices"
+            "Devices"
+        }
+        elseif ($currentList -eq "Users" -and $line -match '^(\w+)\s+(\w+)') {
+            [Void]$object.Add([PsCustomObject] @{
+                ItemType = 'User'
+                Name = $matches[1]
+                Feature = $matches[2]
+
+            })
+        }
+        elseif ($currentList -eq "Devices" -and $line -match '^(\w+)\s+(\w+)') {
+            [Void]$object.Add([PsCustomObject] @{
+                ItemType = 'Device'
+                Name = $matches[1]
+                Feature = $matches[2]
+            })
+        }
+
+    }
+    
+    Return $object
+
+    <# Mettre à jour les variables globales
+    #>
+}
+
+Function Update-UsageData {
+    Param (
+        $Data
+    )
+
+    $global:UsersVal = $Data.totalUsers
+    $global:DevicesVal = $Data.totalDevices
+    $global:InUseVal = $Data.totalInUse
+    $global:InstalledVal = $Data.totalInstalled
+    $global:InstalledOverdraftVal = $Data.totalInstalledOverdraft
+    $global:updateLabelVal = $Data.updateLabelVal
+
 
     $usersLabel.Text = "Users: $UsersVal"
     $devicesLabel.Text = "Devices: $DevicesVal"
@@ -411,45 +479,79 @@ function Update-UsageData {
     $installedLabel.Text = "Installed: $InstalledVal"
     $installedOverdraftLabel.Text = "Installed Overdraft: $InstalledOverdraftVal"
     $updateLabel.Text = $updateLabelVal
+
 }
 
 # Fonctionnalité pour libérer les utilisateurs sélectionnés
 $releaseUserButton.Add_Click({
     foreach ($user in $userListBox.SelectedItems) {
-        $command = "& `"$UDAdminLocation`" -f `"$Feature`" -user `"$user`" -delete"
+        $command = "& `"$UDAdminLocation`" -f `"$($Combobox.SelectedItem)`" -user `"$user`" -delete"
         $Return = Invoke-Expression $command
         $statusLabel.Text = "${command} returns: $Return"  
     }
-    # Rafraîchir les données après libération
-    Update-UsageData
 })
 
 # Fonctionnalité pour libérer les périphériques sélectionnés
 $releaseDeviceButton.Add_Click({
     foreach ($device in $deviceListBox.SelectedItems) {
-        $command = "& `"$UDAdminLocation`" -f `"$Feature`" -device `"$device`" -delete"
+        $command = "& `"$UDAdminLocation`" -f `"$($Combobox.SelectedItem)`" -device `"$device`" -delete"
         $Return = Invoke-Expression $command
         $statusLabel.Text = "${command} returns: $Return"  
     }
-    # Rafraîchir les données après libération
-    Update-UsageData
 })
 
 # Fonctionnalité du bouton Refresh pour mettre à jour les informations
 $refreshButton.Add_Click({
-    Update-UsageData
+    # Execution de udadmin pour récupérer les infos 
+    [Array]$UsageData = Get-UsageData
+    $DataLists = Get-Data | Where-Object Feature -eq $Combobox.SelectedItem
+
+   ## Mise a jour des champs
+    # champs usage
+    Update-UsageData -Data $UsageData[$Index].Data
+
+    # Les listes dans l'interface
+    $usersList = $DataLists | Where-Object ItemType -eq User
+    $devicesList = $DataLists | Where-Object ItemType -eq Device
+
+    $userListBox.Items.Clear()
+    $userListBox.Items.AddRange($usersList.Name)
+    $deviceListBox.Items.Clear()
+    $deviceListBox.Items.AddRange($devicesList.Name)
+
     $statusLabel.Text = "Refresh completed"
 })
 
-# Exécuter la mise à jour initiale pour remplir les données
-Update-UsageData
-Get-licenseServerVersion
 
 # Initialize and show the form.
 $form.Add_Shown({
+
+    # Exécuter la mise à jour initiale pour remplir les données
+    [Array]$UsageData = Get-UsageData
+    If ($UsageData.count -ge 1) {
+        $UsageData.Foreach({
+            [Void]$Combobox.Items.Add($($_.feature))
+            $Combobox.SelectedIndex = 0
+            Update-UsageData -Data $UsageData[0].Data
+        })
+        $Combobox.Show()
+    }
+
+
+    # Les listes dans l'interface
+    $usersList = $DataLists | Where-Object ItemType -eq User
+    $devicesList = $DataLists | Where-Object ItemType -eq Device
+
+    $userListBox.Items.Clear()
+    $userListBox.Items.AddRange($usersList.Name)
+    $deviceListBox.Items.Clear()
+    $deviceListBox.Items.AddRange($devicesList.Name)
+
+    $statusLabel.Text = "Refresh completed"
+
     $form.Activate()  
 })
 
 
 # Afficher la fenêtre
-[Void][system.windows.forms.application]::run($form)
+[Void][System.Windows.Forms.Application]::run($form)
