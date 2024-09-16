@@ -1,37 +1,37 @@
 ﻿Function New-CtxMachineCatalog {
+
     <#
     .SYNOPSIS
-    Créer un Machine Catalog dans Citrix XenDesktop à l'aide de PowerShell.
+        Créer un Machine Catalog dans Citrix XenDesktop à l'aide de PowerShell.
 
     .DESCRIPTION
-    Cette fonction permet de créer un Machine Catalog dans Citrix XenDesktop en utilisant PowerShell. Elle prend en charge divers paramètres pour personnaliser le processus de création du Catalogue, notamment le nom du Catalogue, le nom de l'unité d'hébergement, le nom de l'image maître, le schéma de dénomination des VDAs, le nombre de machines à inclure dans le Catalogue, les contrôleurs de livraison Citrix, etc.
+        Cette fonction permet de créer un Machine Catalog dans Citrix XenDesktop en utilisant PowerShell. Elle prend en charge divers paramètres pour personnaliser le processus de création du Catalogue, notamment le nom du Catalogue, le nom de l'unité d'hébergement, le nom de l'image maître, le schéma de dénomination des VDAs, le nombre de machines à inclure dans le Catalogue, les contrôleurs de livraison Citrix, etc.
 
     .PARAMETER CatalogName
-    Le nom du Catalogue de Machines à créer.
+        Le nom du Catalogue de Machines à créer.
 
     .PARAMETER HostingName
-    Le nom de l'unité d'hébergement où se trouve l'image maître.
+        Le nom de l'unité d'hébergement où se trouve l'image maître.
 
     .PARAMETER MasterVM
-    Le nom de l'image maître à utiliser pour créer les machines virtuelles.
+        Le nom de l'image maître à utiliser pour créer les machines virtuelles.
 
     .PARAMETER NamingScheme
-    Le schéma de dénomination des machines virtuelles.
+        Le schéma de dénomination des machines virtuelles.
 
     .PARAMETER Count
-    Le nombre de machines à inclure dans le Catalogue. Par défaut, il est défini sur 1.
+        Le nombre de machines à inclure dans le Catalogue. Par défaut, il est défini sur 1.
 
     .PARAMETER DDCs
-    La liste des contrôleurs de livraison Citrix à utiliser.
+        La liste des contrôleurs de livraison Citrix à utiliser.
 
     .EXAMPLE
-    New-CtxMachineCatalog -CatalogName "MonCatalogue" -HostingName "MonHébergement" -MasterVM "MonImageMaître" -Count 5 -DDCs @("xendc001.contoso.fr", "xendc002.contoso.fr")
+        New-CtxMachineCatalog -CatalogName "MonCatalogue" -HostingName "MonHébergement" -MasterVM "MonImageMaître" -Count 5 -DDCs @("xendc102.contoso.fr", "xendc202.contoso.fr")
 
-    Crée un Machine Catalog nommé "MonCatalogue" avec l'image maître "MonImageMaître" sur l'unité d'hébergement "MonHébergement". Il crée 5 machines virtuelles et les associe aux contrôleurs de livraison "xendc001.contoso.fr" et "xendc002.contoso.fr".
+        Crée un Machine Catalog nommé "MonCatalogue" avec l'image maître "MonImageMaître" sur l'unité d'hébergement "MonHébergement". Il crée 5 machines virtuelles et les associe aux contrôleurs de livraison "xendc001.contoso.fr" et "xendc002.contoso.fr".
 
     .NOTES
         Auteur: Mickael Roy
-        Site Web: mickaelroy.starprince.fr
         Date de création: 30/04/2024
         Dernière modification: 30/04/2024
 
@@ -47,55 +47,54 @@
         )]
 
         Param (
-            [Parameter(Mandatory=$true, HelpMessage='Specify the Machine Catalog name')]
+            [Parameter(Mandatory=$true)]
             [Alias("BrokerCatalog", "MachineCatalog")]
             [String]$CatalogName,
 
-            [Parameter(Mandatory=$true, HelpMessage='Specify the Hosting Unit name')]
+            [Parameter(Mandatory=$true)]
             [Alias("HostingUnit")]
             [String]$HostingName,
 
-            [Parameter(Mandatory=$true, HelpMessage='Specify the golden image name')]
+            [Parameter(Mandatory=$true)]
             [Alias("MasterImage")]
             [String]$MasterVM,
-            
-            [Parameter(Mandatory=$false, HelpMessage='Specify the naming convention of the vdas')]
+
+            [Parameter(Mandatory=$false)]
             [String]$NamingScheme,
 
-            [Parameter(Mandatory=$false, HelpMessage='Specify the amount of machine to put in the catalog')]
+            [Parameter(Mandatory=$false)]
             [Int]$Count = 1,
 
-            [Parameter(Mandatory=$false, HelpMessage='Specify a list of delivery controllers')]
-            [String[]]$DDCs = @('xendc001.contoso.fr', 'xendc001.contoso.fr')
+            [Parameter(Mandatory=$false)]
+            [Alias("AdminAddress")]
+            [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
         )
+
 
     $ErrorActionPreference = 'Stop'
 
     Function New-NamingScheme {
+        Param ( $CatalogName )
         # This function is a sample, enter you own code to presume the Naming Scheme automatically.
         $TriGram = $CatalogName.Split("_")[4]
-        [Int]$SiteNum = If (($CatalogName.Split("_")[1]) -eq 'SITEA') { 2 }
-        ElseIf (($CatalogName.Split("_")[1]) -eq 'SITEB') { 1 }
-        Else { Throw "Le Machine Catalog ne contient ni SITEA ni SITEB." }
-        $NamingScheme = "xenvda" + $TriGram + $SiteNum + "##"
-        Return " $($NamingScheme.ToLower())"
+        [Int]$SiteNum = If (($CatalogName.Split("_")[1]) -eq 'CLY') { 2 }
+        ElseIf (($CatalogName.Split("_")[1]) -eq 'CLG') { 1 }
+        Else { Throw "Le Machine Catalog ne contient ni CLY ni CLG." }
+        $NamingScheme = "pwxa" + $TriGram + $SiteNum + "##"
+        Return $NamingScheme.ToLower()
     }
 
     Try {
         
-        Write-Host 'Chargement du PSSnapin Citrix... ' -NoNewline
-        @('Citrix.Host.Admin.V2', 'Citrix.Broker.Admin.V2', 'Citrix.MachineCreation.Admin.V2').ForEach({
-            If ( $null -eq  (Get-PSSnapin $_ -ErrorAction SilentlyContinue)) { 
-                Add-PSSnapin $_
-                $i++
-                Write-Host " $i" -ForegroundColor Green -NoNewline
-            }
-        })
-        Write-Host ' OK' -ForegroundColor Green
+        If (-not (Get-Module Citrix.Broker.Commands)) {
+            Write-Host 'Chargement du module Citrix.Broker.Commands...' -NoNewline
+            Import-Module Citrix.Broker.Commands
+            Write-Host 'OK' -ForegroundColor Green
+        }
        
         If ($null -eq $global:AdminAddress) {
             Write-Host 'Verification de la connectivité aux delivery controllers... ' -NoNewline
-            $ConnectionTest1, $ConnectionTest2 = $DDCs | Test-NetConnection -Port 80 | Select-Object ComputerName,TcpTestSucceeded
+            $ConnectionTest1, $ConnectionTest2 = $DDCs | Test-TcpPort -Port 80 | Select-Object ComputerName,TcpTestSucceeded
             If ((!$ConnectionTes1.TcpTestSucceeded) -and (!$ConnectionTest2.TcpTestSucceeded)) { Throw "Aucun delivery controllers n'est joignable." }
             Write-Host 'OK' -ForegroundColor Green
 
@@ -114,7 +113,7 @@
         $VmPath = "$($HostingUnitPath.PSPath)\$MasterVM`.vm"
 
         $VmPathExists = (Test-Path $VmPath)
-        If (-not $VmPathExists) { Throw "This hosting unit does not exist yet."}
+        If (-not $VmPathExists) { Throw "Le Golden Image n'est pas accessible depuis ce hosting."}
         Else { Write-Host "OK" -ForegroundColor Green }
 
         Write-Host "Création du machine catalog: " -NoNewline
@@ -174,7 +173,7 @@
         Write-Host "Ajout des Delivery Controllers au schéma de provisionnement: " -NoNewline
         $provScheme = Get-ProvScheme -ProvisioningSchemeUID $ProvTask.ProvisioningSchemeUid
         $DDCs.ForEach({
-            If ($_ -notin $provScheme.ControllerAddress ) { Add-ProvSchemeControllerAddress -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -ControllerAddress $_ }
+            If ($_ -notin $provScheme.ControllerAddress ) { Add-ProvSchemeControllerAddress -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -ControllerAddress $_ | Out-null}
         })
         Write-Host "OK" -ForegroundColor Green
 
@@ -188,7 +187,7 @@
         $ProvTask = Get-ProvTask -TaskID $provVMTaskID -AdminAddress $adminAddress
 
         $jLength = 0
-        While ($provTask.Active -eq $true){
+        While (($provTask.Active) -or ($provTask.TaskProgress -gt 99)) {
             If ($provTask.CreatedVirtualMachines.Count -le $numVMsToCreate) {
                 Write-Host ("`b" * $jLength) -NoNewline
                 $jLength = "$($provTask.CreatedVirtualMachines.Count)".Length
@@ -212,7 +211,7 @@
         Write-Host "Ajout des machines dans le Machine Catalog: "
         $provisionedVMs = Get-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -AdminAddress $AdminAddress
         $provisionedVMs | Lock-ProvVM -ProvisioningSchemeUID $provScheme.ProvisioningSchemeUID -Tag Brokered -AdminAddress $AdminAddress
-        $provisionedVMs | ForEach-Object { New-BrokerMachine  -CatalogUid $catalog.UID -HostedMachineId $_.VMId -HypervisorConnectionUid $brokerHypConnection.UID -MachineName $_.ADAccountSid -AdminAddress $AdminAddress }
+        $provisionedVMs | ForEach-Object { New-BrokerMachine  -CatalogUid $catalog.UID -HostedMachineId $_.VMId -HypervisorConnectionUid $brokerHypConnection.UID -MachineName $_.ADAccountSid -AdminAddress $AdminAddress | Out-Null}
         Write-Host "OK" -ForegroundColor Green
 
         If ($PSCmdlet.ShouldProcess("$CatalogName","Publication de l'image $MasterVM ?")) {
@@ -229,3 +228,5 @@
     }
 
 }
+
+Export-ModuleMember New-CtxMachineCatalog

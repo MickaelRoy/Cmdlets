@@ -33,12 +33,9 @@
         Auteur: Mickael Roy
         Date de création: 15/05/2024
         Dernière modification: 15/05/2024
-
-    .LINK
-    https://confluence.boursorama.com/x/wA_aLQ
 #>
 
-    [CmdletBinding(HelpUri = 'https://confluence.boursorama.com/x/wA_aLQ')]
+    [CmdletBinding(HelpUri = 'https://confluence.contoso.com/x/wA_aLQ')]
 
     Param (
         [Parameter(Mandatory=$false, HelpMessage='Specify the delivery group name')]

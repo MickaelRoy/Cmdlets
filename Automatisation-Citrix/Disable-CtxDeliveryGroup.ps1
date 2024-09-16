@@ -24,7 +24,7 @@
 
     .NOTES
     Auteur: Mickael Roy
-    Site Web: mickaelroy.starprince.fr
+    Site Web: www.lanaconsulting.fr
     Date de création: 07/05/2024
     Dernière modification: 07/05/2024
 #>
@@ -38,23 +38,12 @@
         
         [Parameter(Mandatory=$false)]
         [Alias("AdminAddress")]
-        [String[]]$DDCs = @('xendc001.contoso.fr', 'xendc002.contoso.fr')
+        [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
     )
 
     $ErrorActionPreference = 'Stop'
 
     Try {
-        <#
-        Write-Host 'Chargement du PSSnapin Citrix... ' -NoNewline
-        @('Citrix.Host.Admin.V2', 'Citrix.Broker.Admin.V2', 'Citrix.MachineCreation.Admin.V2').ForEach({
-            If ( $null -eq  (Get-PSSnapin $_ -ErrorAction SilentlyContinue)) { 
-                Add-PSSnapin $_
-                $i++
-                Write-Host " $i" -ForegroundColor Green -NoNewline
-            }
-        })
-        Write-Host ' OK' -ForegroundColor Green
-        #>
 
         If (-not (Get-Module Citrix.Broker.Commands)) {
             Write-Host 'Chargement du module Citrix.Broker.Commands...' -NoNewline
@@ -64,7 +53,7 @@
 
         If ($null -eq $global:AdminAddress) {
             Write-Host 'Verification de la connectivité aux delivery controllers... ' -NoNewline
-            $ConnectionTest1, $ConnectionTest2 = $DDCs | Test-NetConnection -Port 80 | Select-Object ComputerName,TcpTestSucceeded
+            $ConnectionTest1, $ConnectionTest2 = $DDCs | Test-TcpPort -Port 80 | Select-Object ComputerName,TcpTestSucceeded
             If ((!$ConnectionTes1.TcpTestSucceeded) -and (!$ConnectionTest2.TcpTestSucceeded)) { Throw "Aucun delivery controllers n'est joignable." }
             Write-Host 'OK' -ForegroundColor Green
 
