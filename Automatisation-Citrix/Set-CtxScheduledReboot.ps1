@@ -49,7 +49,7 @@
         [Alias("AdminAddress")]
         [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
     )
-    $ErrorAction = 'Stop'
+    $ErrorActionPreference = 'Stop'
 
     If ($null -ne $Env:WT_SESSION) { $OK = '✔'; $NOK = '❌'; $WARN = '⚠' }
     Else { $OK = 'OK'; $NOK = 'NOK'; $WARN = '/!\'}
@@ -91,10 +91,10 @@
     Try {
         $DG = Get-BrokerDesktopGroup -Name $DeliveryGroup | Select-Object Name, UID
 
-        "CLG", "CLY" | ForEach-Object {
+        "SiteA", "SiteB" | ForEach-Object {
             Switch ($_) {
-                'CLY' { $Day = "Saturday"; $FrDay = "Samedi" }
-                'CLG' { $Day = "Sunday"; $FrDay = "Dimanche"  }
+                'SiteA' { $Day = "Saturday"; $FrDay = "Samedi" }
+                'SiteB' { $Day = "Sunday"; $FrDay = "Dimanche"  }
             }
             Write-Host "Paramètrage du site ${_}: " -NoNewline
             New-BrokerRebootScheduleV2 -Name "$($FrDay)_$($Descr)_$($_)_$($DG.UID)" -DesktopGroupUid $($DG.UID) -Frequency Weekly -Day $Day -StartTime $StartTime -Enabled $false -RebootDuration 30 -WarningTitle "WARNING: Reboot pending" -WarningMessage "Redemarrage dans %m% minutes, merci de sauvegarder votre travail." -WarningDuration 15 -WarningRepeatInterval 5 -RestrictToTag $_ | Out-Null
@@ -109,8 +109,8 @@
         Write-Host "Affectation du tag aux machines: "  -NoNewline
         $Machines = Get-CtxMachine -DeliveryGroup $DeliveryGroup -AdminAddress $AdminAddress
         $Machines | ForEach-Object {
-            If ($_.HostedMachineName -match ".*1\d{2}$") { Get-BrokerTag -Name CLG | Add-BrokerTag -Machine $_ }
-            ElseIf ($_.HostedMachineName -match ".*2\d{2}$") { Get-BrokerTag -Name CLY | Add-BrokerTag -Machine $_ }
+            If ($_.HostedMachineName -match ".*1\d{2}$") { Get-BrokerTag -Name SiteA | Add-BrokerTag -Machine $_ }
+            ElseIf ($_.HostedMachineName -match ".*2\d{2}$") { Get-BrokerTag -Name SiteB | Add-BrokerTag -Machine $_ }
         }
         Write-Host $OK -ForegroundColor Green
     } Catch {
