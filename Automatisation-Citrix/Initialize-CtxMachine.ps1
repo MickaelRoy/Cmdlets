@@ -10,10 +10,10 @@ La fonction `Initialize-CtxMachine` permet de gérer des machines virtuelles Cit
 Le nom de la machine pour laquelle les opérations seront effectuées. C'est le nom d'hôte de la machine Citrix/vCenter.
 
 .PARAMETER DDCs
-Liste des Delivery Controllers Citrix à vérifier pour la connectivité. Par défaut, la fonction utilise les adresses 'xendc102.contoso.fr' et 'xendc202.contoso.fr'.
+Liste des Delivery Controllers Citrix à vérifier pour la connectivité. Par défaut, la fonction utilise les adresses 'xendc102.Contoso.fr' et 'xendc202.Contoso.fr'.
 
 .PARAMETER vCenterServer
-Nom du serveur vCenter auquel se connecter. Par défaut, 'pavcenter001.contoso.fr' est utilisé.
+Nom du serveur vCenter auquel se connecter. Par défaut, 'pavcenter001.Contoso.fr' est utilisé.
 
 .EXAMPLE
 Initialize-CtxMachine -Name "VM1234"
@@ -21,7 +21,7 @@ Initialize-CtxMachine -Name "VM1234"
 Cette commande initialise la machine nommée "VM1234", vérifie sa présence dans Citrix et vCenter, et effectue des opérations de maintenance si nécessaire.
 
 .EXAMPLE
-Initialize-CtxMachine -Name "VM1234" -DDCs 'xendc103.contoso.fr' -vCenterServer 'pavcenter002.contoso.fr'
+Initialize-CtxMachine -Name "VM1234" -DDCs 'xendc103.Contoso.fr' -vCenterServer 'pavcenter002.Contoso.fr'
 
 Cette commande spécifie un serveur vCenter et un Delivery Controller Citrix spécifiques pour la machine "VM1234".
 
@@ -53,10 +53,10 @@ https://support.citrix.com/article/CTX286861
             
         [Parameter(Mandatory=$false)]
         [Alias("AdminAddress")]
-        [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr'),
+        [String[]]$DDCs = @('xendc102.Contoso.fr', 'xendc202.Contoso.fr'),
 
         [Parameter(Mandatory=$false)]
-        [String] $vCenterServer = 'vcenter001.contoso.fr'
+        [String] $vCenterServer = 'vcenter001.Contoso.fr'
     )
     Begin {
 
@@ -101,7 +101,7 @@ https://support.citrix.com/article/CTX286861
             Throw $_
         }
         
-        $OuSearchBase = "OU=DeliveryGroups,OU=Citrix,OU=Servers,OU=Computers,OU=Boursorama,DC=boursorama,DC=fr"
+        $OuSearchBase = "OU=DeliveryGroups,OU=Citrix,OU=Servers,OU=Computers,OU=Contoso,DC=Contoso,DC=fr"
 
     } Process {
 
@@ -205,12 +205,6 @@ https://support.citrix.com/article/CTX286861
 
                 Write-Host "`n- Phase de provisionement -" -ForegroundColor Green
 
-                Write-Host "Capture du start count actuel: " -NoNewline
-                $IdentityPool = Get-AcctIdentityPool -IdentityPoolName $IdentityPoolName -AdminAddress $AdminAddress
-                $CurrentStartCount = $IdentityPool.StartCount
-                $TempStartCount = $Name -replace ".*(\d{2})$", "`$1" 
-                Write-Host $TempStartCount -ForegroundColor Green
-
                 Try {
                     Write-Host "Recherche de l'OU de destination: " -NoNewline
                     $OU = Get-ADOrganizationalUnit -Identity $($IdentityPool.OU)
@@ -221,13 +215,16 @@ https://support.citrix.com/article/CTX286861
                     If ($SuggestedOU) { Write-Host "Genre $SuggestedOU" }
                     Throw "L'OU '$($IdentityPool.OU)' n'éxite pas"
                 }
+                Try {
+                    Write-Host "La machine virtuelle doit être indéxée au StartCount: " -NoNewline
+                    $TempStartCount = $Name -replace ".*(\d{2})$", "`$1" 
+                    Write-Host $TempStartCount -ForegroundColor Green
 
-                Write-Host "Modification temporaire du start count $CurrentStartCount -> ${TempStartCount}: " -NoNewline
-                Set-AcctIdentityPool -IdentityPoolName $IdentityPool.IdentityPoolName -StartCount $TempStartCount
-                Write-Host $OK -ForegroundColor Green
-
-                Write-Host "Creation de l'objet Ordinateur dans Active Directory: " -NoNewline
-                $AdAccount = New-AcctADAccount -IdentityPoolName $IdentityPoolName -Count 1 -AdminAddress $AdminAddress -ErrorAction Stop
+                    Write-Host "Creation de l'objet Ordinateur dans Active Directory: " -NoNewline
+                    $AdAccount = New-AcctADAccount -IdentityPoolName $IdentityPoolName -Count 1 -StartCount $TempStartCount -AdminAddress $AdminAddress -ErrorAction Stop
+                } Catch {
+                    $AdAccount = New-AcctADAccount -IdentityPoolName $IdentityPoolName -Count 1 -AdminAddress $AdminAddress -ErrorAction Stop
+                }
                 If ($AdAccount.SuccessfulAccountsCount -eq 0) {
                     Throw "Création de l'object dans l'AD en échec. Avez-vous les droits suffisants ?"
                 } ElseIf ($AdAccount.SuccessfulAccountsCount -lt $Count) {
@@ -271,10 +268,6 @@ https://support.citrix.com/article/CTX286861
 
                 Write-Host "Ajout de la machine virtuelle au groupe $($DeliveryGroup.Name)`: " -NoNewline
                 $($AdAccount.SuccessfulAccounts) | ForEach-Object { Add-BrokerMachine -MachineName $($_.ADAccountName.TrimEnd('$')) -DesktopGroup $DeliveryGroup.Name -AdminAddress $AdminAddress }
-                Write-Host $OK -ForegroundColor Green
-
-                Write-Host "Restauration du start count à ${CurrentStartCount}: " -NoNewline
-                Set-AcctIdentityPool -IdentityPoolName $IdentityPool.IdentityPoolName -StartCount $CurrentStartCount
                 Write-Host $OK -ForegroundColor Green
             }
 
