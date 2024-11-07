@@ -49,7 +49,7 @@ La fonction vérifie la connectivité aux contrôleurs de livraison spécifiés 
         [Alias("AdminAddress")]
         [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
     )
-    $ErrorAction = 'Stop'
+    $ErrorActionPreference = 'Stop'
 
     If ($null -ne $Env:WT_SESSION) { $OK = '✔'; $NOK = '❌'; $WARN = '⚠' }
     Else { $OK = 'OK'; $NOK = 'NOK'; $WARN = '/!\'}
