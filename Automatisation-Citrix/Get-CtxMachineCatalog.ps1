@@ -22,16 +22,18 @@
         Auteur: Mickael Roy
         Date de création: 30/04/2024
         Dernière modification: 15/05/2024
+    .LINK
+        Lien vers la page confluence : https://confluence.contoso.com/x/wA_aLQ
 
 #>
-    [CmdletBinding(HelpUri = 'https://confluence.boursorama.com/x/wA_aLQ',DefaultParameterSetName = 'Implicit')]
+    [CmdletBinding(HelpUri = 'https://confluence.contoso.com/x/wA_aLQ',DefaultParameterSetName = 'Implicit')]
     Param (
         [Parameter(Mandatory=$false, Position=0, ValueFromPipeline=$True, ValueFromPipelineByPropertyName=$True, ParameterSetName = 'Implicit')]
         [Alias("DesktopGroupName")]
         [String[]]$InputObject,
 
         [Parameter(Mandatory=$false, Position = 2)]
-        [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
+        [String[]]$DDCs = @('xenddc101.contoso.fr', 'xenddc201.contoso.fr')
     )
     DynamicParam {
         $ParameterName = "DeliveryGroups"
@@ -46,11 +48,19 @@
         $ParameterAttribute = New-Object System.Management.Automation.ParameterAttribute
         $ParameterAttribute.Mandatory = $false
         $ParameterAttribute.Position = 1
+        #$ParameterAttribute.ValueFromPipeline = $True
+        #$ParameterAttribute.ValueFromPipelineByPropertyName = $True
         $ParameterAttribute.ParameterSetName = "Explicit"
 
 
     # Add the attributes to the attributes collection
         $AttributeCollection.Add($ParameterAttribute)
+
+    # Create the Alias Attributes
+        #$ParameterAliases = [System.Management.Automation.AliasAttribute]::new("DesktopGroupName")
+
+    # Add the attributes to the attributes collection
+        #$AttributeCollection.Add($ParameterAliases)
 
     # Generate and set the ValidateSet
 
@@ -73,14 +83,14 @@
             If (-not (Get-Module Citrix.Broker.Commands)) {
                 Write-Host 'Chargement du module Citrix.Broker.Commands...' -NoNewline
                 Import-Module Citrix.Broker.Commands
-                Write-Host 'OK' -ForegroundColor Green
+                Write-Host $OK -ForegroundColor Green
             }
 
             If ($null -eq $global:AdminAddress) {
                 Write-Host 'Verification de la connectivité aux delivery controllers... ' -NoNewline
                 $ConnectionTest1, $ConnectionTest2 = $DDCs | Test-TcpPort -Port 80 | Select-Object ComputerName,TcpTestSucceeded
-                If ((!$ConnectionTes1.TcpTestSucceeded) -and (!$ConnectionTest2.TcpTestSucceeded)) { Throw "Aucun delivery controllers n'est joignable." }
-                Write-Host 'OK' -ForegroundColor Green
+                If ((!$ConnectionTest1.TcpTestSucceeded) -and (!$ConnectionTest2.TcpTestSucceeded)) { Throw "Aucun delivery controllers n'est joignable." }
+                Write-Host $OK -ForegroundColor Green
 
                 $global:AdminAddress = $ConnectionTest1, $ConnectionTest2 | Where-Object TcpTestSucceeded | Get-Random | Select-Object -ExpandProperty ComputerName
                 Set-HypAdminConnection -AdminAddress $global:AdminAddress
@@ -91,7 +101,7 @@
             }
 
         } Catch {
-            Write-Host 'NOK' -ForegroundColor Red
+            Write-Host $NOK -ForegroundColor Red
             Throw $_
         }
         $MachineObjects = [System.Collections.ArrayList]::new()

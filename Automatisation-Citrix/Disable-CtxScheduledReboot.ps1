@@ -22,14 +22,14 @@ Alias: AdminAddress
 Par défaut : @('xendc102.contoso.fr', 'xendc202.contoso.fr')
 
 .EXAMPLE
-Disable-CtxScheduledReboot -Name "Samedi_reboots_User_Bureau_CLG_12345"
+Disable-CtxScheduledReboot -Name "Samedi_reboots_User_Bureau"
 
-Cet exemple désactive la planification de redémarrage nommée "Samedi_reboots_User_Bureau_CLG_12345".
+Cet exemple désactive la planification de redémarrage nommée "Samedi_reboots_User_Bureau".
 
 .EXAMPLE
-Disable-CtxScheduledReboot -DeliveryGroup "Bastion-Adm_prd_2k22" -DDCs @('controller1.domain.com', 'controller2.domain.com')
+Disable-CtxScheduledReboot -DeliveryGroup "Bastion-2022" -DDCs @('xendc102.contoso.fr', 'xendc202.contoso.fr')
 
-Cet exemple désactive les redémarrages planifiés pour le groupe de bureaux "Bastion-Adm_prd_2k22" avec des contrôleurs de livraison spécifiés.
+Cet exemple désactive les redémarrages planifiés pour le groupe de bureaux "Bastion-2022" avec des contrôleurs de livraison spécifiés.
 
 .NOTES
 Assurez-vous que le module Citrix.Broker.Commands est installé et accessible.
@@ -47,9 +47,9 @@ La fonction vérifie la connectivité aux contrôleurs de livraison spécifiés 
         
         [Parameter(Mandatory=$false)]
         [Alias("AdminAddress")]
-        [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
+        [String[]]$DDCs = @('xenddc101.contoso.fr', 'xenddc201.contoso.fr')
     )
-    $ErrorActionPreference = 'Stop'
+    $ErrorAction = 'Stop'
 
     If ($null -ne $Env:WT_SESSION) { $OK = '✔'; $NOK = '❌'; $WARN = '⚠' }
     Else { $OK = 'OK'; $NOK = 'NOK'; $WARN = '/!\'}

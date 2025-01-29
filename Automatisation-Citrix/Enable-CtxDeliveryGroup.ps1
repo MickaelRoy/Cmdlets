@@ -24,7 +24,6 @@
 
     .NOTES
     Auteur: Mickael Roy
-    Site Web: www.lanaconsulting.fr
     Date de création: 07/05/2024
     Dernière modification: 07/05/2024
 #>
@@ -38,7 +37,7 @@
         
         [Parameter(Mandatory=$false)]
         [Alias("AdminAddress")]
-        [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr')
+        [String[]]$DDCs = @('xenddc101.contoso.fr', 'xenddc201.contoso.fr')
     )
 
     $ErrorActionPreference = 'Stop'

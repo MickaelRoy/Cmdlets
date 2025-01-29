@@ -10,10 +10,10 @@ La fonction `Initialize-CtxMachine` permet de gérer des machines virtuelles Cit
 Le nom de la machine pour laquelle les opérations seront effectuées. C'est le nom d'hôte de la machine Citrix/vCenter.
 
 .PARAMETER DDCs
-Liste des Delivery Controllers Citrix à vérifier pour la connectivité. Par défaut, la fonction utilise les adresses 'xendc102.Contoso.fr' et 'xendc202.Contoso.fr'.
+Liste des Delivery Controllers Citrix à vérifier pour la connectivité. Par défaut, la fonction utilise les adresses 'xendc102.contoso.fr' et 'xendc202.contoso.fr'.
 
 .PARAMETER vCenterServer
-Nom du serveur vCenter auquel se connecter. Par défaut, 'pavcenter001.Contoso.fr' est utilisé.
+Nom du serveur vCenter auquel se connecter. Par défaut, 'pavcenter001.contoso.fr' est utilisé.
 
 .EXAMPLE
 Initialize-CtxMachine -Name "VM1234"
@@ -21,7 +21,7 @@ Initialize-CtxMachine -Name "VM1234"
 Cette commande initialise la machine nommée "VM1234", vérifie sa présence dans Citrix et vCenter, et effectue des opérations de maintenance si nécessaire.
 
 .EXAMPLE
-Initialize-CtxMachine -Name "VM1234" -DDCs 'xendc103.Contoso.fr' -vCenterServer 'pavcenter002.Contoso.fr'
+Initialize-CtxMachine -Name "VM1234" -DDCs 'xendc103.contoso.fr' -vCenterServer 'pavcenter002.contoso.fr'
 
 Cette commande spécifie un serveur vCenter et un Delivery Controller Citrix spécifiques pour la machine "VM1234".
 
@@ -37,6 +37,11 @@ Cette fonction est utilisée pour gérer les machines virtuelles dans un environ
 
 La fonction demande confirmation avant de procéder aux étapes destructrices si elle est utilisée avec l'option `ShouldProcess`.
 
+.NOTES
+Auteur: Mickael Roy
+Date de création: 30/04/2024
+Dernière modification: 22/11/2024
+
 .LINK
 https://support.citrix.com/article/CTX286861
 #>
@@ -50,13 +55,16 @@ https://support.citrix.com/article/CTX286861
         [Parameter(Mandatory=$false, HelpMessage='Specify the machine name')]
         [Alias("MachineName")]
         [String]$Name,
+
+        [Parameter(Mandatory=$false, HelpMessage='Specify to stop after the clean')]
+        [Switch]$RemoveOnly,
             
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$false, HelpMessage='Specify delicery controller to use')]
         [Alias("AdminAddress")]
-        [String[]]$DDCs = @('xendc102.Contoso.fr', 'xendc202.Contoso.fr'),
+        [String[]]$DDCs = @('xenddc101.contoso.fr', 'xenddc201.contoso.fr'),
 
         [Parameter(Mandatory=$false)]
-        [String] $vCenterServer = 'vcenter001.Contoso.fr'
+        [String] $vCenterServer = 'vcenter001.contoso.fr'
     )
     Begin {
 
@@ -101,7 +109,7 @@ https://support.citrix.com/article/CTX286861
             Throw $_
         }
         
-        $OuSearchBase = "OU=DeliveryGroups,OU=Citrix,OU=Servers,OU=Computers,OU=Contoso,DC=Contoso,DC=fr"
+        $OuSearchBase = "OU=DeliveryGroups,OU=Citrix,OU=Servers,OU=Computers,OU=contoso,DC=contoso,DC=fr"
 
     } Process {
 
@@ -109,32 +117,49 @@ https://support.citrix.com/article/CTX286861
             
             Write-Host "Capture des informations relatives à la machine ${Name}: " -NoNewline
             $Machine = Get-BrokerMachine -HostedMachineName $Name -AdminAddress $AdminAddress
-            $ADAccount = Get-AcctADAccount -AdminAddress $AdminAddress | Where-Object ADAccountName -Match "^.*\\$Name.$"
-            If ($null -ne $Machine) {
-                $DeliveryGroup = Get-BrokerDesktopGroup -DesktopGroupName $Machine.DesktopGroupName -AdminAddress $AdminAddress
-                $Catalog = Get-BrokerCatalog -CatalogName $Machine.CatalogName -AdminAddress $AdminAddress
-                $Scheme = Get-ProvScheme -ProvisioningSchemeUid $Catalog.ProvisioningSchemeId -AdminAddress $AdminAddress
-                $IdentityPoolName = $Scheme.IdentityPoolName
-                Write-Host $OK -ForegroundColor Green
-            } Else {
-                Write-Host $WARN -ForegroundColor Yellow
-                Write-Host "La machine $name est introuvable coté citrix" -NoNewline
+            $ADAccount = Get-AcctADAccount -AdminAddress $AdminAddress -ADAccountSid $Machine.SID #| Where-Object ADAccountName -Match "^.*\\$Name.$"
+            Write-Host $OK -ForegroundColor Green
 
-                $VM = VMware.VimAutomation.Core\Get-VM $Name -ErrorAction SilentlyContinue
-                If ($null -ne $VM) {
-                    Write-Host " mais elle à été trouvée coté hyperviseur."
+            If (-not $RemoveOnly) {
+                Write-Host "Capture des informations nécessaires à la reconstruction de la machine ${Name}: " -NoNewline
+                If ($null -ne $Machine) {
+                    $DeliveryGroup = Get-BrokerDesktopGroup -DesktopGroupName $Machine.DesktopGroupName -AdminAddress $AdminAddress
+                    $DeliveryGroupName = $DeliveryGroup.Name
+                    $Catalog = Get-BrokerCatalog -CatalogName $Machine.CatalogName -AdminAddress $AdminAddress
+                    $Scheme = Get-ProvScheme -ProvisioningSchemeUid $Catalog.ProvisioningSchemeId -AdminAddress $AdminAddress
+                    $IdentityPoolName = $Scheme.IdentityPoolName
+                    $IdentityPool = Get-AcctIdentityPool -IdentityPoolName $IdentityPoolName
+                    Write-Host $OK -ForegroundColor Green
                 } Else {
-                    Write-Host ", pas plus que du coté hyperviseur."
-                }
+                    Write-Host $WARN -ForegroundColor Yellow
+                    Write-Host "La machine $name est introuvable coté citrix" -NoNewline
 
-                $SupposedNamingScheme = $Name -replace "(\w*\d{1})\d{2}", "`$1"
-                $SupposedIdentityPool = Get-AcctIdentityPool | Where-Object NamingScheme -match "^${SupposedNamingScheme}##"
-                If ($null -ne $SupposedIdentityPool) {
-                    Write-Host "En me basant sur le nom de la machine, je suppose que le nom du pool d'identité est: " -NoNewline
-                    $IdentityPoolName = $SupposedIdentityPool.IdentityPoolName
-                    Write-Host $IdentityPoolName -ForegroundColor Green
-                    
-                    $Scheme = Get-ProvScheme  -AdminAddress $AdminAddress | Where-Object IdentityPoolName -eq $IdentityPoolName
+                    $VM = VMware.VimAutomation.Core\Get-VM $Name -ErrorAction SilentlyContinue
+                    If ($null -ne $VM) {
+                        Write-Host " mais elle à été trouvée coté hyperviseur."
+                    } Else {
+                        Write-Host ", idem du coté hyperviseur."
+                    }
+                    If ($null -ne $ADAccount) {
+                        $IdentityPoolName = $ADAccount.IdentityPoolName
+                        $IdentityPool = Get-AcctIdentityPool -IdentityPoolName $IdentityPoolName -AdminAddress $AdminAddress
+                    } Else {
+                        $SupposedNamingScheme = $Name -replace "(\w*\d{1})\d{2}", "`$1"
+                        [Array]$SupposedIdentityPool = Get-AcctIdentityPool | Where-Object NamingScheme -match "^${SupposedNamingScheme}##"
+                        Write-Host "En me basant sur le nom de la machine, je suppose que le nom du pool d'identité est: " -NoNewline
+
+                        If ($SupposedIdentityPool.count -eq 1) {
+                            $IdentityPoolName = $SupposedIdentityPool.IdentityPoolName
+                            $IdentityPool = Get-AcctIdentityPool -IdentityPoolName $IdentityPoolName -AdminAddress $AdminAddress
+                            Write-Host $IdentityPoolName -ForegroundColor Green
+                        } ElseIf ($SupposedIdentityPool.Count -gt 1) {
+                            Throw "Le peu de résidu de la machine $Name ne me permettent pas de choisir le bon pool d'identité."
+                        } Else {
+                            throw "Je ne peux pas identifier le nom du pool d'identité, une intervention manuelle est nécessaire."
+                        }
+                    }
+
+                    $Scheme = Get-ProvScheme -AdminAddress $AdminAddress | Where-Object IdentityPoolName -eq $IdentityPoolName
                     $Catalog = Get-BrokerCatalog -ProvisioningSchemeId $Scheme.ProvisioningSchemeUid -AdminAddress $AdminAddress
                     $DeliveryGroupName = Get-BrokerMachine -CatalogName $Catalog.CatalogName -AdminAddress $AdminAddress | Select-Object -ExpandProperty DesktopGroupName -Unique
                     If ($DeliveryGroupName.Count -eq 1) {
@@ -144,15 +169,13 @@ https://support.citrix.com/article/CTX286861
                     } Else {
                         Throw "Je ne peux pas déduire le delivery group à utiliser car le $($Catalog.CatalogName) ne semble contenir aucune machine."
                     }
-                } Else {
-                    throw "Je ne peux pas identifier le nom du pool d'identité, une intervention manuelle est nécessaire."
                 }
             }
             
             If ($PSCmdlet.ShouldProcess("$Name","Destruction du VDI ?")) {
                 If ($Machine) {
                     Write-Host "Vérification de l'état de la machine virtuelle: " -NoNewline
-                    If (-not $Machine.InMaintenanceMode -and $Machine.PowerState -ne "On") { Throw "La machine se doit d'être en maintenance ou éteinte pour continuer" }
+                    If (-not $Machine.InMaintenanceMode -and $Machine.PowerState -ne "On") { Throw "La machine se doit d'être en maintenance ou éteinte pour continuer." }
                     Write-Host $OK -ForegroundColor Green
 
                     Write-Host "`n- Phase de destruction -" -ForegroundColor Red
@@ -163,8 +186,10 @@ https://support.citrix.com/article/CTX286861
                     }
                     
                     Write-Host "Retrait de la machine du machine catalog: " -NoNewline
-                    Get-BrokerMachine $Machine.MachineName -AdminAddress $AdminAddress | Remove-BrokerMachine -AdminAddress $AdminAddress
+                    Remove-BrokerMachine -MachineName $Machine.MachineName -Force -AdminAddress $AdminAddress
                     Write-Host $OK -ForegroundColor Green
+                } Else {
+                    Write-Host "`n- Phase de destruction -" -ForegroundColor Red
                 }
 
                 $ProvVM = Get-ProvVM -VMName $Name -AdminAddress $AdminAddress
@@ -177,6 +202,7 @@ https://support.citrix.com/article/CTX286861
                 If ($null -ne $ProvVM.VMName) {
                     Write-Host "Suppression de la machine virtuelle: " -NoNewline
                     $DeleteVMResult = $ProvVM | Remove-ProvVM -AdminAddress $AdminAddress
+                    Start-Sleep -Seconds 5
                     If ($DeleteVMResult.TaskState -eq 'Finished') {
                         Write-Host $OK -ForegroundColor Green
                     } Else { Write-Host $NOK -ForegroundColor Red }
@@ -195,11 +221,16 @@ https://support.citrix.com/article/CTX286861
                 } 
 
                 If ($null -ne $ADAccount) {
-                    Write-Host "Suppression de l'object Active Directory: " -NoNewline
-                    $RemoveResult = Remove-AcctADAccount -ADAccountName $ADAccount.ADAccountName -IdentityPoolName $IdentityPoolName -RemovalOption "delete"
+                    Write-Host "Suppression de l'objet Active Directory: " -NoNewline
+                    $RemoveResult = Remove-AcctADAccount -ADAccountName $ADAccount.ADAccountName -IdentityPoolName $ADAccount.IdentityPoolName -RemovalOption "delete"
                     If ($RemoveResult.FailedAccountsCount -eq 0) { Write-Host $OK -ForegroundColor Green }
                     Else { Write-Host $NOK -ForegroundColor Red }
                 }
+                Write-Host "`Destruction terminée."
+            }
+            If ($RemoveOnly) {
+                Write-Host "`nRecontruction non souhaitée, je sors."
+                Return
             }
             If ($PSCmdlet.ShouldProcess("$Name","Reconstruction du VDI ?")) {
 
@@ -210,7 +241,7 @@ https://support.citrix.com/article/CTX286861
                     $OU = Get-ADOrganizationalUnit -Identity $($IdentityPool.OU)
                     $OU.DistinguishedName
                 } Catch {
-                    $SuggestedOU = $(Get-ADOrganizationalUnit -SearchBase $OuSearchBase -Filter "Name -like '*$($DeliveryGroup.Name)*'" | Select-Object -ExpandProperty DistinguishedName -First 1)
+                    $SuggestedOU = $(Get-ADOrganizationalUnit -SearchBase $OuSearchBase -Filter "Name -like '*$DeliveryGroupName*'" | Select-Object -ExpandProperty DistinguishedName -First 1)
                     Write-Host "l'OU n'existe pas, éxécutez la commande `"Set-AcctIdentityPool -IdentityPoolName $IdentityPoolName -AdminAddress $AdminAddress -OU [NomDistingué]`""                        
                     If ($SuggestedOU) { Write-Host "Genre $SuggestedOU" }
                     Throw "L'OU '$($IdentityPool.OU)' n'éxite pas"
@@ -247,7 +278,7 @@ https://support.citrix.com/article/CTX286861
 
                 $jLength = 0
                 While ($provTask.Active) {
-                    If ($provTask.TaskProgress -lt $100) {
+                    If ($provTask.TaskProgress -lt 100) {
                         Write-Host ("`b" * $jLength) -NoNewline
                         $jLength = "$($provTask.TaskProgress.Count)".Length
                         Write-Host "$($provTask.TaskProgress.Count)" -NoNewline
@@ -258,16 +289,16 @@ https://support.citrix.com/article/CTX286861
                 If ($null -ne $ProvTask.TerminatingError) { 
                     Throw $ProvTask.TerminatingError
                 } Else {
-                    If ($iLength -gt 0 ) { Write-Host ("`b" * $iLength) -NoNewline }
+                    If ($jLength -gt 0 ) { Write-Host ("`b" * $jLength) -NoNewline }
                     Write-Host $OK -ForegroundColor Green
                 }
 
                 Write-Host "Enregistrement de la machine virtuelle: " -NoNewline
-                $($ProvTask.CreatedVirtualMachines) | Foreach { New-BrokerMachine -CatalogUid $($Catalog.Uid) -MachineName $_.VMName -AdminAddress $AdminAddress | Out-Null }
+                $($ProvTask.CreatedVirtualMachines) | ForEach-Object { New-BrokerMachine -CatalogUid $($Catalog.Uid) -MachineName $_.VMName -AdminAddress $AdminAddress | Out-Null }
                 Write-Host $OK -ForegroundColor Green 
 
-                Write-Host "Ajout de la machine virtuelle au groupe $($DeliveryGroup.Name)`: " -NoNewline
-                $($AdAccount.SuccessfulAccounts) | ForEach-Object { Add-BrokerMachine -MachineName $($_.ADAccountName.TrimEnd('$')) -DesktopGroup $DeliveryGroup.Name -AdminAddress $AdminAddress }
+                Write-Host "Ajout de la machine virtuelle au groupe ${DeliveryGroupName}: " -NoNewline
+                $($ProvTask.CreatedVirtualMachines) | ForEach-Object { Add-BrokerMachine -MachineName $($_.ADAccountName.TrimEnd('$')) -DesktopGroup $DeliveryGroupName -AdminAddress $AdminAddress }
                 Write-Host $OK -ForegroundColor Green
             }
 

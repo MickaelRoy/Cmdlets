@@ -41,7 +41,10 @@
     .NOTES
     Auteur : Mickael ROY
     Date de création : 28/03/2024
-    Dernière modification: 30/04/2024
+    Dernière modification: 30/09/2024
+
+    .LINK
+        Lien vers la page confluence : https://confluence.contoso.com/x/wA_aLQ
 
 #>
     [CmdletBinding(
@@ -57,7 +60,7 @@
 
         [Parameter(Mandatory=$false)]
         [Alias("AdminAddress")]
-        [String[]]$DDCs = @('xendc102.contoso.fr', 'xendc202.contoso.fr'),
+        [String[]]$DDCs = @('xenddc101.contoso.fr', 'xenddc201.contoso.fr'),
 
         [Parameter(Mandatory=$false)]
         [String] $vCenterUser = 'svc_vcenter_RO_Script_Snap',
@@ -67,7 +70,10 @@
 
         [Switch] $ForceSnapShot, 
 
-        [Int] $SnapShotRetentionDelay = 1
+        [Int] $SnapShotRetentionDelay = 0,
+
+        [ValidateRange(30, 900)]
+        [Int] $WaitForShutdown = 300
     )
     Begin {
 
@@ -168,9 +174,6 @@
 
         } #Close function Get-TimeSpanPretty
 
-        If ($null -ne $Env:WT_SESSION) { $OK = '✔'; $NOK = '❌'; $WARN = '⚠' }
-        Else { $OK = 'OK'; $NOK = 'NOK'; $WARN = '/!\'}
-
         Try {
         
             If (-not (Get-Module Citrix.Broker.Commands)) {
@@ -179,7 +182,7 @@
                 Write-Host $OK -ForegroundColor Green
             }
        
-            If ($null -eq $global:defaultviserver) {
+            If (-not $global:DefaultVIServers.Isconnected) {
                 Write-Host 'Connexion au vCenter... ' -NoNewline
                 $vCenterConnectionParameter = @{
                     Server = $vCenterServer
@@ -216,80 +219,133 @@
         Foreach ($Catalog in $CatalogName) {
             Remove-Variable snap, snaps, LatestSnapshot -ErrorAction SilentlyContinue
             Try {
+             # https://support.citrix.com/article/CTX216896
                 Write-Host "Déduction du Master Template relatif au MCA $Catalog... " -NoNewline
                 $TempResult = Get-ProvScheme -AdminAddress $AdminAddress -ProvisioningSchemeUid (Get-BrokerCatalog -AdminAddress $AdminAddress -Name $Catalog).ProvisioningSchemeId | Select-Object HostingUnitName, MasterImageVM
-                $MasterVM = $TempResult.MasterImageVM.Split('\')[3].Split('.')[0]
+                If ($TempResult -match '\\(\w+)(\.vm)\\') {
+                    $MasterVM = $Matches[1]
+                }
                 $HostingUnitName = $TempResult.HostingUnitName
                 Write-Host $OK -ForegroundColor Green
-                Write-Host "Il semble que le Golden Image soit $MasterVM"
+                Write-Host "Il semble que le Golden Image soit " -NoNewline
+                Write-Host $MasterVM -ForegroundColor Yellow
             } Catch {
                 Write-Host $NOK -ForegroundColor Red
                 Throw $_
             }
 
-            $PreviousTasks = Get-ProvTask -AdminAddress $AdminAddress -Type PublishImage | Where-Object { ($_.HostingUnitName -eq $HostingUnitName) -and ($_.TaskStateInformation -eq "Terminated") }
-            If ($PreviousTasks) {
-                Try {
-                    Write-Host "Suppression des tâches de provisionnement précédemment en échec..."
-                    $PreviousTasks| ForEach-Object {
-                        If (($_ | Remove-ProvTask) -eq "Success") { Write-Host "Tâche `'$($_.TaskId)`' supprimnée." -ForegroundColor Yellow }
+            # Récupérer l'état de la VM
+            Try {
+                Write-Host "Vérification de l'état de la VM: " -NoNewline
+                $vm = VMware.VimAutomation.Core\Get-VM -Name $MasterVM -ErrorAction SilentlyContinue
+                Write-Host "$OK" -ForegroundColor Green
+
+                If ($vm.PowerState -ne 'PoweredOff') { 
+                    Write-Host "Attention la machine virtuelle $MasterVM est $($vm.PowerState)." -ForegroundColor Yellow
+             
+                    $userChoice = $PSCmdlet.ShouldProcess("$MasterVM","Souhaitez-vous attendre son extinction complète ?")
+
+                    If ($userChoice) {
+                        $Chrono = [System.Diagnostics.Stopwatch]::startnew()
+
+                        While ($vm.PowerState -ne 'PoweredOff') {
+                            $remainingTime = [Math]::Max(0, [int][Math]::Floor($WaitForShutdown - $Chrono.Elapsed.TotalSeconds))
+                            Write-Host "`rMachine en attente d'extinction. $remainingTime secondes restantes.  " -NoNewline
+                            If ($Chrono.Elapsed.TotalSeconds -gt $WaitForShutdown) { 
+                                Write-Host "`nTrop tard. La golden image doit être à l'arrêt pour pouvoir être déployée.`n" -ForegroundColor Red
+                                Return
+                                $Chrono.Stop()
+                            }
+
+                            $vm = VMware.VimAutomation.Core\Get-VM -Name $MasterVM -ErrorAction SilentlyContinue
+                            If ($vm.PowerState -eq 'PoweredOff') {
+                                Write-Host "`rLa VM '$MasterVM' est éteinte." -ForegroundColor Green
+                                break
+                            } Else {
+                                $Sleep = If ($remainingTime -gt 10) { 10 } Else { $remainingTime }
+                                Start-Sleep -Seconds $Sleep
+                            }
+                        }
+                    } Else {
+                         Write-Host "Nous n'irons pas plus loin dans ce cas.`n" -ForegroundColor Yellow
+                         Return
                     }
-                } Catch {
-                    Write-Host $NOK -ForegroundColor Red
-                    Throw $_
                 }
+            } Catch {
+                Write-Host "$NOK" -ForegroundColor Red
+                Throw $_
             }
 
-            Write-Host "Recherche du dernier snapshot sur le vCenter... " -NoNewline
-            $LatestSnapshot = Get-Snapshot -VM $MasterVM | Sort-Object Created -Descending | Select-Object Name, Id, Created -First 1
-            If ($LatestSnapshot) { 
-                Write-Host $OK -ForegroundColor Green
-                [String]$TimeSpanDays = Test-Date ([DateTime]$LatestSnapshot.Created)
-                $TimeSpan = New-TimeSpan -Start ([DateTime]$LatestSnapshot.Created) -End ([DateTime]::Now)
+            If ($PSCmdlet.ShouldProcess("$Catalog","Déploiement du master $MasterVM ?")) {
 
-                Switch ($TimeSpanDays) {
-                    "0" { Write-Host "Le dernier snapshot date d'aujourd'hui. " -NoNewline }
-                    "1" { Write-Host "Le dernier snapshot date d'hier. " -NoNewline }
-                    "2" { Write-Host "Le dernier snapshot date de deux jours. " -NoNewline }
-                    "3+" { Write-Host "Le dernier snapshot date de plus de trois jours. " -NoNewline }
-                    default { Write-Host "La date du dernier snapshot n'a aucun sens. " -NoNewline }
+                $PreviousTasks = Get-ProvTask -AdminAddress $AdminAddress -Type PublishImage | Where-Object { ($_.HostingUnitName -eq $HostingUnitName) -and ($_.TaskStateInformation -eq "Terminated") }
+                If ($PreviousTasks) {
+                    Try {
+                        Write-Host "Suppression des tâches de provisionnement précédemment en échec..."
+                        $PreviousTasks| ForEach-Object {
+                            If (($_ | Remove-ProvTask) -eq "Success") { Write-Host "Tâche `'$($_.TaskId)`' supprimnée." -ForegroundColor Yellow }
+                        }
+                    } Catch {
+                        Write-Host $NOK -ForegroundColor Red
+                        Throw $_
+                    }
                 }
-            } Else  {
-                Write-Host $WARN -ForegroundColor Yellow
-            }
 
-          # Algorithme de snapshot
-            $NewSnapshotDescription = "Automated Snapshot completed by Update-CtxMachineCatalog script. Initiated by: $env:USERNAME"
-            $NewSnapshotName = "$MasterVM-Citrix_XD_Automated_Deployement_$UnicId"
-
-            If ($ForceSnapShot) { Write-Host "Vous avez demandé un snapshot systématique.";$DoSnap = $true }
-            Elseif ($null -eq $LatestSnapshot) { Write-Host "Il n'y a pas encore de snapshot.";$DoSnap = $true }
-            #ElseIf ($LatestSnapshot.Name -ne $NewSnapshotName) { Write-Host "Il ne sera pas réutilisé." }
-            ElseIf (($SnapshotRetentionDelay -eq 0) -and ($LatestSnapshot.Name -ne $NewSnapshotName)) { Write-Host "`'SnapshotRetentionDelay`' est à 0, il ne sera donc pas réutilisé.";$DoSnap = $true }
-            ElseIf (($SnapshotRetentionDelay -ne 0) -and ($TimeSpanDays -gt $SnapshotRetentionDelay)) { Write-Host "Selon vos critères de rétention, le snapshot trouvé est expiré.";$DoSnap = $true }
-            Else { Write-Host "Selon vos critères de rétention le snapshot trouvé est valide";$DoSnap = $False }
-
-            If ($DoSnap) {
-                Try {
-                    Write-Host "Création du snapshot `"$NewSnapshotName`"..." -NoNewline
-                    $Snap = New-HypVMSnapshot -AdminAddress $AdminAddress -LiteralPath XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm -SnapshotName $NewSnapshotName -SnapshotDescription $NewSnapshotDescription
+                Write-Host "Recherche du dernier snapshot sur le vCenter... " -NoNewline
+                $LatestSnapshot = VMware.VimAutomation.Core\Get-Snapshot -VM $MasterVM | Sort-Object Created -Descending | Select-Object Name, Id, Created -First 1
+                If ($LatestSnapshot) { 
                     Write-Host $OK -ForegroundColor Green
-                } Catch {
-                    Write-Host $NOK -ForegroundColor Red
-                    Throw $_
+                    [String]$TimeSpanDays = Test-Date ([DateTime]$LatestSnapshot.Created)
+                    $TimeSpan = New-TimeSpan -Start ([DateTime]$LatestSnapshot.Created) -End ([DateTime]::Now)
+
+                    Switch ($TimeSpanDays) {
+                        "0" { Write-Host "Le dernier snapshot date d'aujourd'hui. " -NoNewline }
+                        "1" { Write-Host "Le dernier snapshot date d'hier. " -NoNewline }
+                        "2" { Write-Host "Le dernier snapshot date de deux jours. " -NoNewline }
+                        "3+" { Write-Host "Le dernier snapshot date de plus de trois jours. " -NoNewline }
+                        default { Write-Host "La date du dernier snapshot n'a aucun sens. " -NoNewline }
+                    }
+                } Else  {
+                    Write-Host $WARN -ForegroundColor Yellow
+                }
+
+              # Algorithme de snapshot
+                $NewSnapshotDescription = "Automated Snapshot completed by Update-CtxMachineCatalog script. Initiated by: $env:USERNAME"
+                $NewSnapshotName = "$MasterVM-Citrix_XD_Automated_Deployement_$UnicId"
+
+                If ($ForceSnapShot) { Write-Host "Vous avez demandé un snapshot systématique.";$DoSnap = $true }
+                Elseif ($null -eq $LatestSnapshot) { Write-Host "Il n'y a pas encore de snapshot.";$DoSnap = $true }
+                ElseIf (($SnapshotRetentionDelay -eq 0) -and ($LatestSnapshot.Name -ne $NewSnapshotName)) { Write-Host "`'SnapshotRetentionDelay`' est à 0, il ne sera donc pas réutilisé.";$DoSnap = $true }
+                ElseIf (($SnapshotRetentionDelay -ne 0) -and ($TimeSpanDays -gt $SnapshotRetentionDelay)) { Write-Host "Selon vos critères de rétention, le snapshot trouvé est expiré.";$DoSnap = $true }
+                Else { Write-Host "Selon vos critères de rétention le snapshot trouvé est valide";$DoSnap = $False }
+
+                If ($DoSnap) {
+                    Try {
+                        Write-Host "Création du snapshot `"$NewSnapshotName`"..." -NoNewline
+                        $Snap = New-HypVMSnapshot -AdminAddress $AdminAddress -LiteralPath XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm -SnapshotName $NewSnapshotName -SnapshotDescription $NewSnapshotDescription
+                        Write-Host $OK -ForegroundColor Green
+                    } Catch {
+                        Write-Host $NOK -ForegroundColor Red
+                        Throw $_
+                    }
+                } Else {
+                    Write-Host "Le snapshot qui sera réutilisé date de $(Get-TimeSpanPretty $TimeSpan)."
                 }
             } Else {
-                Write-Host "Le snapshot qui sera réutilisé date de $(Get-TimeSpanPretty $TimeSpan)."
+                Return
             }
-            
+
             Try {
                 If ([String]::IsNullOrEmpty($Snap)) {
-                    Write-Host "Recherche du snapshot sur `"XDHyp:\hostingunits\$HostingUnitName`" pour le présenter lors du provisionnement... " -NoNewLine
+                    If ($null -eq $HostingUnitName -or $null -eq $MasterVM) { 
+                        Throw "Un parachute a été déployé, contactez votre expert PowerShell le plus proche."
+                    }
+                    Write-Host "Recherche du snapshot sur `"XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm`" pour le présenter lors du provisionnement... " -NoNewLine
                     Write-Verbose -Message "Recherche dans: XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm"
                     $Snaps = Get-ChildItem -Recurse -Path XDHyp:\hostingunits\$HostingUnitName\$($MasterVM).vm
                     $Snap = $Snaps[-1].PSPath
                     Write-Host $OK -ForegroundColor Green
-                    Write-Host "L'Id du snapshot est $($Snaps[-1].Id.Split('-')[-1])"
+                    Write-Host "Le nom du snapshot est $($Snaps[-1].Name) (Id: $($Snaps[-1].Id.Split('-')[-1]))"
                 } 
 
                 If ($PSCmdlet.ShouldProcess("$Catalog","Publication de l'image $MasterVM ?")) {
@@ -307,5 +363,5 @@
             Return $Tasks
     }
 }
-
+ 
 Export-ModuleMember Update-CtxMachineCatalog
