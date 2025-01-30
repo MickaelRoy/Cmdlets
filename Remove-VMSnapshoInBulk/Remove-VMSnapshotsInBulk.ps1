@@ -42,36 +42,28 @@
     [CmdletBinding( SupportsShouldProcess=$true, ConfirmImpact='High' )]
     param (
         [string]$VMName,
-        [datetime]$EndDate = [DateTime]::Now.AddMonths(-1),
-
-        [Parameter(Mandatory=$false)]
-        [String] $vCenterServer = 'vcenter001.contoso.fr'
-
+        [datetime]$EndDate = [DateTime]::Now.AddMonths(-1)
     )
 
-    If ($null -eq $global:defaultviserver) {
-        Write-Host 'Connexion au vCenter... ' -NoNewline
-        $vCenterConnectionParameter = @{
-            Server = $vCenterServer
-        }
-        If ($PSBoundParameters.ContainsKey('vCenterUser')) {
-            $vCenterConnectionParameter.User = $vCenterUser
-        }
-        $vCenterConnection = Connect-VIServer @vCenterConnectionParameter
-        Write-Host $OK -ForegroundColor Green
-    }
+    # Connect to vCenter
+    Connect-vSphere | Out-Null
 
     Try {
         # Get VM object
         $vm = vmware.vimautomation.core\Get-VM -Name $VMName
-        $vmView = $vm | Get-View -Property 'Name'
+        $vmView = $vm | Get-View -Property 'Name', 'Runtime'
         
         # Get all snapshots of the VM between the specified dates
         [Array]$snapshots = Get-Snapshot -VM $vm | Where-Object { $_.Created -le $endDate }
 
         if ($snapshots.Count -eq 0) {
-            Write-Host "Aucun snapshot à supprimer concernant la VM $VMName."
-            return
+            Write-Host "Aucun snapshot à supprimer concernant la VM $VMName. " -NoNewline
+            If ([bool]$vmView.Runtime.ConsolidationNeeded) {
+                Write-Host "Cependant une consolidation est à faire."
+            } Else {
+                Write-Host
+                Return
+            }
         }
 
         $shouldProcess = $PSCmdlet.ShouldProcess($VMName, "Suppression des $($snapshots.Count) snapshot ?")
@@ -93,7 +85,10 @@
 
             Write-Host "Consolidation: " -NoNewline
             $CTask = $vmView.ConsolidateVMDisks_Task()
-            If ($CTask.Value) { Write-Host $CTask.Value }
+            If ($CTask.Value) { 
+                Write-Host $CTask.Value
+                VMware.VimAutomation.Common\Get-Task -id $([VMware.Vim.ManagedObjectReference]::new("Task-$($CTask.Value)")) -ErrorAction Stop
+            }
             Else { Write-Host "Echec." }
 
         }
